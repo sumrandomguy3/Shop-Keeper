@@ -1155,7 +1155,7 @@ showView('list');
 <script>
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/sw.js').catch(()=>{});
+    navigator.serviceWorker.register('/shop-keeper/sw.js', {scope: '/shop-keeper/'}).catch(()=>{});
   });
 }
 </script>
