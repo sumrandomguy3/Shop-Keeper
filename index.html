@@ -1155,7 +1155,11 @@ showView('list');
 <script>
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/shop-keeper/sw.js', {scope: '/shop-keeper/'}).catch(()=>{});
+    // Derive the base path dynamically so it works on any GitHub Pages repo name
+    const base = window.location.pathname.replace(/\/[^/]*$/, '/');
+    navigator.serviceWorker.register(base + 'sw.js', { scope: base })
+      .then(r => console.log('SW registered, scope:', r.scope))
+      .catch(e => console.warn('SW registration failed:', e));
   });
 }
 </script>

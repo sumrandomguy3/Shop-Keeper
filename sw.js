@@ -1,15 +1,14 @@
-const CACHE = 'shopkeeper-v1';
-const ASSETS = [
-  '/shop-keeper/',
-  '/shop-keeper/index.html',
-  '/shop-keeper/manifest.json',
-  '/shop-keeper/icon-192.png',
-  '/shop-keeper/icon-512.png'
-];
+const CACHE = 'shopkeeper-v2';
 
 self.addEventListener('install', e => {
   e.waitUntil(
-    caches.open(CACHE).then(c => c.addAll(ASSETS))
+    caches.open(CACHE).then(c => c.addAll([
+      './',
+      './index.html',
+      './manifest.json',
+      './icon-192.png',
+      './icon-512.png'
+    ]))
   );
   self.skipWaiting();
 });
