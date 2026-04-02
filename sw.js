@@ -1,13 +1,14 @@
-const CACHE = 'shopkeeper-v2';
+const CACHE = 'shopkeeper-v3';
+const BASE = '/Shop-Keeper/';
 
 self.addEventListener('install', e => {
   e.waitUntil(
     caches.open(CACHE).then(c => c.addAll([
-      './',
-      './index.html',
-      './manifest.json',
-      './icon-192.png',
-      './icon-512.png'
+      BASE,
+      BASE + 'index.html',
+      BASE + 'manifest.json',
+      BASE + 'icon-192.png',
+      BASE + 'icon-512.png'
     ]))
   );
   self.skipWaiting();
@@ -27,3 +28,4 @@ self.addEventListener('fetch', e => {
     caches.match(e.request).then(cached => cached || fetch(e.request))
   );
 });
+
