@@ -206,6 +206,7 @@ label { font-size: 13px; font-weight: 600; color: var(--text2); display: block; 
       <div class="header-title" id="hTitle">Shop Keeper</div>
     </div>
     <button class="header-action" id="hAction" onclick="showAddJobModal()">+ Job</button>
+    <button class="header-action" id="hSettings" onclick="showSettingsModal()" style="padding:7px 10px;margin-left:4px">&#9881;</button>
   </div>
   <div class="gcal-bar" id="gcalBar">
     <div class="gcal-dot disconnected" id="gcalDot"></div>
@@ -297,10 +298,16 @@ label { font-size: 13px; font-weight: 600; color: var(--text2); display: block; 
         </div>
         <div id="laborList"></div>
         <button class="btn btn-secondary" onclick="showAddLaborModal()" style="width:100%;margin-bottom:4px">+ Add Labor Entry</button>
-        <div class="slabel">Markup & other</div>
+        <div class="slabel">Misc materials</div>
+        <div id="miscMatList"></div>
+        <button class="btn btn-secondary" onclick="showAddMiscModal()" style="width:100%;margin-bottom:4px">+ Add Misc Material</button>
+        <div class="slabel">Markup, tax & other</div>
         <div class="row2">
-          <div><label>Markup (%)</label><input type="number" id="markupPct" placeholder="20" onchange="saveMarkup()"/></div>
-          <div><label>Other ($)</label><div class="prefix"><span>$</span><input type="number" id="otherCosts" placeholder="0" onchange="saveOther()"/></div></div>
+          <div><label>Markup (%)</label><input type="number" id="markupPct" placeholder="0" onchange="saveMarkup()"/></div>
+          <div><label>Sales Tax (%)</label><input type="number" id="salesTaxPct" placeholder="0" onchange="saveSalesTax()"/></div>
+        </div>
+        <div class="row2">
+          <div><label>Other costs ($)</label><div class="prefix"><span>$</span><input type="number" id="otherCosts" placeholder="0" onchange="saveOther()"/></div></div>
         </div>
         <textarea id="otherNotes" rows="2" placeholder="Hardware, finish, delivery..." onchange="saveOther()"></textarea>
       </div>
@@ -329,11 +336,6 @@ label { font-size: 13px; font-weight: 600; color: var(--text2); display: block; 
 </div>
 
 <script>
-const WOOD_PRESETS=[
-  {name:'Pine',price:4.5},{name:'Poplar',price:5},{name:'Hard Maple',price:8.5},
-  {name:'White Oak',price:9},{name:'Red Oak',price:7.5},{name:'Cherry',price:10},
-  {name:'Walnut',price:14},{name:'Ash',price:7},{name:'Mahogany',price:12},{name:'Teak',price:22}
-];
 const STATUS_OPTS=[
   {val:'inquiry', label:'New Inquiry',  cls:'s-inquiry',  archived:false},
   {val:'quoted',  label:'Quoted',       cls:'s-quoted',   archived:false},
@@ -344,12 +346,73 @@ const STATUS_OPTS=[
 function sInfo(v){ return STATUS_OPTS.find(s=>s.val===v)||STATUS_OPTS[0]; }
 function isArchived(job){ const si=sInfo(job.status||'inquiry'); return si.archived; }
 
+// ── STORAGE — split photos out to avoid 5MB localStorage limit ──
+const JOBS_KEY   = 'wj_v7';
+const PHOTOS_KEY = 'wj_v7_photos';  // stored separately: { jobId: [ {src,note,date}, ... ] }
+const SETTINGS_KEY = 'wj_settings';
+
+// Settings defaults
+const SETTINGS_DEFAULTS = {
+  laborRate: 65,
+  markupPct: 0,
+  salesTaxPct: 0,
+  lumberPrices: {
+    'Pine':       4.50,
+    'Poplar':     5.00,
+    'Hard Maple': 8.50,
+    'White Oak':  9.00,
+    'Red Oak':    7.50,
+    'Cherry':    10.00,
+    'Walnut':    14.00,
+    'Ash':        7.00,
+    'Mahogany':  12.00,
+    'Teak':      22.00
+  }
+};
+
+let settings = {...SETTINGS_DEFAULTS};
+try {
+  const s = JSON.parse(localStorage.getItem(SETTINGS_KEY)||'null');
+  if(s) settings = {...SETTINGS_DEFAULTS, ...s, lumberPrices:{...SETTINGS_DEFAULTS.lumberPrices,...(s.lumberPrices||{})}};
+} catch(e){}
+
+function saveSettings(){ try{ localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings)); }catch(e){} }
+function getLumberPresets(){ return Object.entries(settings.lumberPrices).map(([name,price])=>({name,price})); }
+
+// Load jobs (without photos)
 let jobs=[], currentJobId=null, calYear, calMonth, prevView='list';
 const today=new Date(); today.setHours(0,0,0,0);
 calYear=today.getFullYear(); calMonth=today.getMonth();
 
-try{ jobs=JSON.parse(localStorage.getItem('wj_v6')||'[]'); }catch(e){ jobs=[]; }
-function save(){ try{ localStorage.setItem('wj_v6',JSON.stringify(jobs)); }catch(e){} }
+try{ jobs=JSON.parse(localStorage.getItem(JOBS_KEY)||'[]'); }catch(e){ jobs=[]; }
+
+// Load photo store
+let photoStore = {};
+try{ photoStore=JSON.parse(localStorage.getItem(PHOTOS_KEY)||'{}'); }catch(e){ photoStore={}; }
+
+// Migrate old data: if jobs have photos embedded, move them out
+let migrated=false;
+jobs.forEach(j=>{
+  if(j.photos && j.photos.length){
+    photoStore[j.id]=j.photos;
+    j.photos=[];
+    migrated=true;
+  }
+});
+
+function save(){
+  // Strip photos from jobs before saving to keep under 5MB
+  const jobsClean = jobs.map(j=>({...j, photos:[]}));
+  try{ localStorage.setItem(JOBS_KEY, JSON.stringify(jobsClean)); }catch(e){ console.warn('Jobs save failed',e); }
+}
+function savePhotos(){
+  try{ localStorage.setItem(PHOTOS_KEY, JSON.stringify(photoStore)); }catch(e){ console.warn('Photo save failed — storage may be full',e); showToast('Storage full — some photos may not save'); }
+}
+function getJobPhotos(id){ return photoStore[id]||[]; }
+function setJobPhotos(id, photos){ photoStore[id]=photos; savePhotos(); }
+
+if(migrated){ save(); savePhotos(); }
+
 function getJob(){ return jobs.find(j=>j.id===currentJobId); }
 function fmt(n){ return '$'+parseFloat(n||0).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g,','); }
 function urgColor(u){ return u==='urgent'?'var(--red)':u==='warning'?'var(--orange)':u==='soon'?'var(--yellow)':'var(--green)'; }
@@ -420,7 +483,7 @@ function jobCardHtml(j, archived){
   const urg=urgency(j), lbl=urgLabel(j);
   const done=(j.cuts||[]).filter(c=>c.done).length, total=(j.cuts||[]).length;
   const bf=(j.bfLog||[]).reduce((s,b)=>s+b.bf,0);
-  const photos=(j.photos||[]).length;
+  const photos=getJobPhotos(j.id).length;
   const est=calcEst(j);
   const pct=progPct(j);
   const cardClass=archived?'archived':(urg||'');
@@ -475,12 +538,14 @@ function openJob(id){
   document.getElementById('hTitle').textContent=job.name;
   document.getElementById('backBtn').style.display='block';
   document.getElementById('hAction').style.display='none';
+  document.getElementById('hSettings').style.display='none';
   showView('detail'); sw('cutlist');
 }
 function goBack(){
   document.getElementById('hTitle').textContent='Shop Keeper';
   document.getElementById('backBtn').style.display='none';
   document.getElementById('hAction').style.display='block';
+  document.getElementById('hSettings').style.display='block';
   currentJobId=null;
   showView(prevView||'list');
 }
@@ -633,7 +698,7 @@ function deleteBF(i){ const j=getJob(); j.bfLog.splice(i,1); save(); renderBFLog
 
 // PHOTOS
 function renderPhotos(){
-  const j=getJob(); const photos=j.photos||[];
+  const j=getJob(); const photos=getJobPhotos(j.id);
   let html=photos.map((p,i)=>{
     const src=typeof p==='object'?p.src:p;
     const note=typeof p==='object'?p.note:'';
@@ -656,27 +721,29 @@ function renderPhotos(){
 }
 function handlePhoto(e){
   const files=Array.from(e.target.files); if(!files.length) return;
-  const j=getJob(); if(!j.photos) j.photos=[];
+  const j=getJob();
+  const photos=getJobPhotos(j.id);
   let loaded=0;
   files.forEach(file=>{
     const reader=new FileReader();
     reader.onload=ev=>{
-      j.photos.unshift({src:ev.target.result, note:'', date:new Date().toLocaleDateString()});
+      photos.unshift({src:ev.target.result, note:'', date:new Date().toLocaleDateString()});
       loaded++;
-      if(loaded===files.length){ save(); renderPhotos(); if(files.length===1) openLightbox(0); }
+      if(loaded===files.length){ setJobPhotos(j.id,photos); renderPhotos(); if(files.length===1) openLightbox(0); }
     };
     reader.readAsDataURL(file);
   });
   e.target.value='';
 }
 function deletePhoto(i){
-  const j=getJob(); j.photos.splice(i,1); save(); renderPhotos();
+  const j=getJob(); const photos=getJobPhotos(j.id);
+  photos.splice(i,1); setJobPhotos(j.id,photos); renderPhotos();
 }
 
 // LIGHTBOX
 let _lbIdx=0;
 function openLightbox(i){
-  const j=getJob(); const photos=j.photos||[];
+  const j=getJob(); const photos=getJobPhotos(j.id);
   if(!photos.length) return;
   _lbIdx=i;
   let lb=document.getElementById('lightbox');
@@ -685,7 +752,7 @@ function openLightbox(i){
   lb.style.display='flex';
 }
 function renderLightbox(){
-  const j=getJob(); const photos=j.photos||[];
+  const j=getJob(); const photos=getJobPhotos(j.id);
   const p=photos[_lbIdx]; if(!p) return;
   const src=typeof p==='object'?p.src:p;
   const note=typeof p==='object'?(p.note||''):'';
@@ -704,14 +771,16 @@ function renderLightbox(){
     </div>`;
 }
 function lbNav(dir){
-  const j=getJob(); const photos=j.photos||[];
+  const j=getJob(); const photos=getJobPhotos(j.id);
   _lbIdx=(_lbIdx+dir+photos.length)%photos.length;
   renderLightbox();
 }
 function savePhotoNote(val){
-  const j=getJob(); if(!j.photos[_lbIdx]) return;
-  if(typeof j.photos[_lbIdx]==='string') j.photos[_lbIdx]={src:j.photos[_lbIdx],note:'',date:''};
-  j.photos[_lbIdx].note=val; save();
+  const j=getJob(); const photos=getJobPhotos(j.id);
+  if(!photos[_lbIdx]) return;
+  if(typeof photos[_lbIdx]==='string') photos[_lbIdx]={src:photos[_lbIdx],note:'',date:''};
+  photos[_lbIdx].note=val;
+  setJobPhotos(j.id,photos);
 }
 function savePhotoNoteBtn(){
   const ta=document.querySelector('.lightbox-note'); if(!ta) return;
@@ -720,9 +789,10 @@ function savePhotoNoteBtn(){
   closeLightbox();
 }
 function deletePhotoFromLightbox(){
-  const j=getJob(); j.photos.splice(_lbIdx,1); save();
-  if(!j.photos.length){ closeLightbox(); renderPhotos(); return; }
-  _lbIdx=Math.min(_lbIdx,j.photos.length-1);
+  const j=getJob(); const photos=getJobPhotos(j.id);
+  photos.splice(_lbIdx,1); setJobPhotos(j.id,photos);
+  if(!photos.length){ closeLightbox(); renderPhotos(); return; }
+  _lbIdx=Math.min(_lbIdx,photos.length-1);
   renderLightbox(); renderPhotos();
 }
 function closeLightbox(){
@@ -733,12 +803,16 @@ function closeLightbox(){
 // ESTIMATE
 function calcEst(job){
   const matTotal=(job.materials||[]).reduce((s,m)=>s+(m.bf*m.pricePerBf),0);
-  const rate=parseFloat(job.laborRate||65);
+  const miscTotal=(job.miscMaterials||[]).reduce((s,m)=>s+m.cost,0);
+  const rate=parseFloat(job.laborRate||settings.laborRate||65);
   const laborTotal=(job.labor||[]).reduce((s,l)=>s+(l.hours*rate),0);
   const other=parseFloat(job.otherCosts||0);
-  const sub=matTotal+laborTotal+other;
-  const markup=sub*(parseFloat(job.markupPct||0)/100);
-  return {matTotal,laborTotal,other,sub,markup,total:sub+markup,rate};
+  const sub=matTotal+miscTotal+laborTotal+other;
+  const markup=sub*(parseFloat(job.markupPct??settings.markupPct??0)/100);
+  const afterMarkup=sub+markup;
+  const tax=afterMarkup*(parseFloat(job.salesTaxPct??settings.salesTaxPct??0)/100);
+  const total=afterMarkup+tax;
+  return {matTotal,miscTotal,laborTotal,other,sub,markup,tax,total,rate};
 }
 function renderEstimate(){
   const j=getJob(); const e=calcEst(j);
@@ -748,10 +822,12 @@ function renderEstimate(){
       <button onclick="showShareModal()" style="background:rgba(245,232,200,0.18);border:1px solid rgba(245,232,200,0.3);border-radius:8px;padding:5px 12px;color:#f5e8c8;font-size:13px;font-weight:700;cursor:pointer">&#8679; Share</button>
     </div>
     <div class="est-body">
-      <div class="cost-line"><span>Materials</span><span>${fmt(e.matTotal)}</span></div>
+      <div class="cost-line"><span>Lumber & materials</span><span>${fmt(e.matTotal)}</span></div>
+      ${e.miscTotal>0?`<div class="cost-line"><span>Misc materials</span><span>${fmt(e.miscTotal)}</span></div>`:''}
       <div class="cost-line"><span>Labor (${(j.labor||[]).reduce((s,l)=>s+l.hours,0).toFixed(1)} hrs @ ${fmt(e.rate)}/hr)</span><span>${fmt(e.laborTotal)}</span></div>
       ${e.other>0?`<div class="cost-line"><span>Other</span><span>${fmt(e.other)}</span></div>`:''}
-      ${parseFloat(j.markupPct||0)>0?`<div class="cost-line"><span>Markup (${j.markupPct}%)</span><span>${fmt(e.markup)}</span></div>`:''}
+      ${parseFloat(j.markupPct??settings.markupPct??0)>0?`<div class="cost-line"><span>Markup (${j.markupPct??settings.markupPct}%)</span><span>${fmt(e.markup)}</span></div>`:''}
+      ${parseFloat(j.salesTaxPct??settings.salesTaxPct??0)>0?`<div class="cost-line"><span>Sales tax (${j.salesTaxPct??settings.salesTaxPct}%)</span><span>${fmt(e.tax)}</span></div>`:''}
       <div class="cost-line total"><span>Total</span><span>${fmt(e.total)}</span></div>
     </div>`;
   document.getElementById('matList').innerHTML=(j.materials||[]).length?
@@ -766,10 +842,25 @@ function renderEstimate(){
       <div style="font-size:13px;font-weight:500;color:var(--text2);margin-top:3px">${m.bf.toFixed(2)} bf × ${fmt(m.pricePerBf)}/bf</div>
     </div>`).join('')
     :`<div style="color:var(--text3);font-size:14px;font-weight:500;margin-bottom:12px">No materials yet.</div>`;
-  document.getElementById('laborRate').value=j.laborRate||65;
-  document.getElementById('markupPct').value=j.markupPct||'';
+  document.getElementById('laborRate').value=j.laborRate??settings.laborRate;
+  document.getElementById('markupPct').value=j.markupPct??settings.markupPct;
+  document.getElementById('salesTaxPct').value=j.salesTaxPct??settings.salesTaxPct;
   document.getElementById('otherCosts').value=j.otherCosts||'';
   document.getElementById('otherNotes').value=j.otherNotes||'';
+  // Misc materials
+  const miscEl=document.getElementById('miscMatList');
+  miscEl.innerHTML=(j.miscMaterials||[]).length?
+    (j.miscMaterials||[]).map((m,i)=>`<div class="mat-card">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <div style="font-size:15px;font-weight:600;color:var(--text)">${m.name}</div>
+        <div style="display:flex;align-items:center;gap:8px">
+          <span style="font-size:15px;font-weight:700;color:var(--wood)">${fmt(m.cost)}</span>
+          <button class="btn-icon" onclick="delMisc(${i})">&#10005;</button>
+        </div>
+      </div>
+      ${m.note?`<div style="font-size:12px;color:var(--text2);margin-top:2px">${m.note}</div>`:''}
+    </div>`).join('')
+    :`<div style="color:var(--text3);font-size:14px;font-weight:500;margin-bottom:12px">No misc materials yet.</div>`;
   const rate=parseFloat(j.laborRate||65);
   document.getElementById('laborList').innerHTML=(j.labor||[]).length?
     (j.labor||[]).map((l,i)=>`<div class="labor-row">
@@ -782,10 +873,12 @@ function renderEstimate(){
     </div>`).join('')
     :`<div style="color:var(--text3);font-size:14px;font-weight:500;margin-bottom:12px">No labor entries.</div>`;
 }
-function saveLaborRate(){ const j=getJob(); j.laborRate=parseFloat(document.getElementById('laborRate').value)||65; save(); renderEstimate(); }
+function saveLaborRate(){ const j=getJob(); j.laborRate=parseFloat(document.getElementById('laborRate').value)||settings.laborRate; save(); renderEstimate(); }
 function saveMarkup(){ const j=getJob(); j.markupPct=parseFloat(document.getElementById('markupPct').value)||0; save(); renderEstimate(); }
+function saveSalesTax(){ const j=getJob(); j.salesTaxPct=parseFloat(document.getElementById('salesTaxPct').value)||0; save(); renderEstimate(); }
 function saveOther(){ const j=getJob(); j.otherCosts=parseFloat(document.getElementById('otherCosts').value)||0; j.otherNotes=document.getElementById('otherNotes').value; save(); renderEstimate(); }
 function delMat(i){ const j=getJob(); j.materials.splice(i,1); save(); renderEstimate(); }
+function delMisc(i){ const j=getJob(); j.miscMaterials.splice(i,1); save(); renderEstimate(); }
 function delLabor(i){ const j=getJob(); j.labor.splice(i,1); save(); renderEstimate(); }
 
 // SHARE
@@ -868,7 +961,9 @@ function addJob(){
     startDate:document.getElementById('mStart').value,
     dueDate:document.getElementById('mDue').value,
     notes:document.getElementById('mNotes').value.trim(),
-    cuts:[],bfLog:[],photos:[],materials:[],labor:[],laborRate:65,markupPct:0,otherCosts:0,otherNotes:''
+    cuts:[],bfLog:[],photos:[],materials:[],miscMaterials:[],labor:[],
+    laborRate:settings.laborRate,markupPct:settings.markupPct,salesTaxPct:settings.salesTaxPct,
+    otherCosts:0,otherNotes:''
   });
   save(); closeModal(); renderJobList();
   gcalSyncJob(jobs[0]);
@@ -947,10 +1042,11 @@ function addCut(){
 
 function showAddMatModal(){
   const j=getJob(); const bfTotal=(j.bfLog||[]).reduce((s,b)=>s+b.bf,0);
+  const presets=getLumberPresets();
   document.getElementById('modalInner').innerHTML=`
     <div class="modal-title">Add Material</div>
     <label>Species *</label>
-    <div class="chips">${WOOD_PRESETS.map(p=>`<div class="chip" onclick="fillPreset('${p.name}',${p.price})">${p.name}</div>`).join('')}</div>
+    <div class="chips">${presets.map(p=>`<div class="chip" onclick="fillPreset('${p.name}',${p.price})">${p.name} <span style="opacity:0.6;font-size:11px">${fmt(p.price)}/bf</span></div>`).join('')}</div>
     <input id="mMName" type="text" placeholder="e.g. White Oak"/>
     <label>Price per board foot ($) *</label>
     <div class="prefix"><span>$</span><input id="mMPrice" type="number" placeholder="9.00" step="0.5"/></div>
@@ -993,7 +1089,70 @@ function addLabor(){
   save(); closeModal(); renderEstimate();
 }
 
-// ── GOOGLE CALENDAR SYNC ──────────────────────────────────────────
+function showAddMiscModal(){
+  document.getElementById('modalInner').innerHTML=`
+    <div class="modal-title">Add Misc Material</div>
+    <label>Item name *</label><input id="mmName" type="text" placeholder="e.g. Sandpaper, Wood glue, Stain..."/>
+    <label>Cost ($) *</label>
+    <div class="prefix"><span>$</span><input id="mmCost" type="number" placeholder="0.00" step="0.50"/></div>
+    <label>Note</label><input id="mmNote" type="text" placeholder="Optional note"/>
+    <div class="modal-btns">
+      <button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="addMisc()">Add</button>
+    </div>`;
+  openModal();
+}
+function addMisc(){
+  const name=document.getElementById('mmName').value.trim();
+  const cost=parseFloat(document.getElementById('mmCost').value);
+  if(!name||!cost){ alert('Enter a name and cost.'); return; }
+  const j=getJob(); if(!j.miscMaterials) j.miscMaterials=[];
+  j.miscMaterials.push({name, cost, note:document.getElementById('mmNote').value.trim()});
+  save(); closeModal(); renderEstimate();
+}
+
+function showSettingsModal(){
+  const lp=settings.lumberPrices;
+  document.getElementById('modalInner').innerHTML=`
+    <div class="modal-title">&#9881; Settings</div>
+    <div class="slabel" style="margin-top:0">Global defaults</div>
+    <div style="font-size:12px;color:var(--text3);margin-bottom:10px">These apply to new jobs. Existing jobs keep their own values.</div>
+    <div class="row2">
+      <div><label>Default labor rate ($/hr)</label>
+        <div class="prefix"><span>$</span><input id="sLaborRate" type="number" value="${settings.laborRate}" step="5"/></div>
+      </div>
+      <div><label>Default markup (%)</label>
+        <input id="sMarkup" type="number" value="${settings.markupPct}" step="1"/>
+      </div>
+    </div>
+    <label>Default sales tax (%)</label>
+    <input id="sTax" type="number" value="${settings.salesTaxPct}" step="0.1"/>
+    <div class="slabel">Lumber prices ($/board foot)</div>
+    <div style="font-size:12px;color:var(--text3);margin-bottom:10px">Edit prices to match your local lumber yard.</div>
+    ${Object.entries(lp).map(([name,price])=>`
+    <div class="row2" style="align-items:center;margin-bottom:4px">
+      <div style="flex:2;font-size:14px;font-weight:600;color:var(--text);padding-top:4px">${name}</div>
+      <div style="flex:1"><div class="prefix"><span>$</span><input type="number" class="lumber-price-input" data-species="${name}" value="${price}" step="0.50" style="margin-bottom:6px"/></div></div>
+    </div>`).join('')}
+    <div class="modal-btns" style="margin-top:12px">
+      <button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="saveSettingsModal()">Save Settings</button>
+    </div>`;
+  openModal();
+}
+function saveSettingsModal(){
+  settings.laborRate=parseFloat(document.getElementById('sLaborRate').value)||65;
+  settings.markupPct=parseFloat(document.getElementById('sMarkup').value)||0;
+  settings.salesTaxPct=parseFloat(document.getElementById('sTax').value)||0;
+  document.querySelectorAll('.lumber-price-input').forEach(inp=>{
+    const sp=inp.getAttribute('data-species');
+    const val=parseFloat(inp.value);
+    if(sp && val>0) settings.lumberPrices[sp]=val;
+  });
+  saveSettings();
+  closeModal();
+  showToast('Settings saved');
+} ──────────────────────────────────────────
 const GCAL_CLIENT_ID = '613511921628-8432fenppk3k3f7va6cfmetkilrq7n9r.apps.googleusercontent.com';
 const GCAL_SCOPE = 'https://www.googleapis.com/auth/calendar.events';
 const GCAL_CALENDAR_ID = 'primary';
