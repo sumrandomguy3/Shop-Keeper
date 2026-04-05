@@ -1224,31 +1224,28 @@ function gcalDisconnect() {
   showToast('Disconnected from Google Calendar');
 }
 
-// Sync a single job — create or update its calendar event
+// Sync a single job — adds due date only as a single-day event
 async function gcalSyncJob(job) {
   if (!gcalIsConnected()) return;
-  if (!job.startDate && !job.dueDate) return;
+  if (!job.dueDate) return;
   if (isArchived(job)) return;
 
   const si = sInfo(job.status || 'inquiry');
-  const colorId = job.status === 'progress' ? '2'  // green
-    : job.status === 'quoted'   ? '3'  // mauve/purple
-    : job.status === 'inquiry'  ? '7'  // peacock/teal
-    : '1'; // lavender default
-
-  const start = job.startDate || job.dueDate;
-  const end = job.dueDate || job.startDate;
+  const colorId = job.status === 'progress' ? '2'
+    : job.status === 'quoted'   ? '3'
+    : job.status === 'inquiry'  ? '7'
+    : '1';
 
   const event = {
-    summary: `[SK] ${job.name}`,
+    summary: `[SK] ${job.name} — Due`,
     description: [
       job.client ? `Client: ${job.client}` : '',
       `Status: ${si.label}`,
       job.notes ? `Notes: ${job.notes}` : '',
-      `\nManaged by Shop Keeper`
+      '\nManaged by Shop Keeper'
     ].filter(Boolean).join('\n'),
-    start: { date: start },
-    end: { date: end },
+    start: { date: job.dueDate },
+    end:   { date: job.dueDate },
     colorId,
     extendedProperties: { private: { shopKeeperId: job.id } }
   };
