@@ -346,7 +346,7 @@ const STATUS_OPTS=[
 function sInfo(v){ return STATUS_OPTS.find(s=>s.val===v)||STATUS_OPTS[0]; }
 function isArchived(job){ const si=sInfo(job.status||'inquiry'); return si.archived; }
 
-// ── STORAGE — split photos out to avoid 5MB localStorage limit ──
+// STORAGE: split photos out to avoid 5MB localStorage limit
 const JOBS_KEY   = 'wj_v7';
 const PHOTOS_KEY = 'wj_v7_photos';  // stored separately: { jobId: [ {src,note,date}, ... ] }
 const SETTINGS_KEY = 'wj_settings';
@@ -1152,7 +1152,9 @@ function saveSettingsModal(){
   saveSettings();
   closeModal();
   showToast('Settings saved');
-} ──────────────────────────────────────────
+}
+
+// ── GOOGLE CALENDAR SYNC ──
 const GCAL_CLIENT_ID = '613511921628-8432fenppk3k3f7va6cfmetkilrq7n9r.apps.googleusercontent.com';
 const GCAL_SCOPE = 'https://www.googleapis.com/auth/calendar.events';
 const GCAL_CALENDAR_ID = 'primary';
@@ -1301,7 +1303,7 @@ async function gcalSyncAll() {
   showToast(`Synced ${active.length} job${active.length !== 1 ? 's' : ''} to Google Calendar`);
 }
 
-// ── HOOK GCAL INTO JOB ACTIONS ──────────────────────────────────
+// HOOK GCAL INTO JOB ACTIONS
 
 // Patch addJob to sync after creation
 const _origAddJob = addJob;
