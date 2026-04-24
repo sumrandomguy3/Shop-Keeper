@@ -417,7 +417,17 @@ function save(){
   try{ localStorage.setItem(JOBS_KEY, JSON.stringify(jobsClean)); }catch(e){ console.warn('Jobs save failed',e); }
 }
 function savePhotos(){
-  try{ localStorage.setItem(PHOTOS_KEY, JSON.stringify(photoStore)); }catch(e){ console.warn('Photo save failed — storage may be full',e); showToast('Storage full — some photos may not save'); }
+  try{
+    localStorage.setItem(PHOTOS_KEY, JSON.stringify(photoStore));
+  } catch(e){
+    const isQuota = e instanceof DOMException && (e.name === 'QuotaExceededError' || e.name === 'NS_ERROR_DOM_QUOTA_REACHED' || e.code === 22);
+    if(isQuota){
+      console.warn('Photo save failed — storage quota exceeded', e);
+      showToast('Storage full — some photos may not save');
+    } else {
+      console.warn('Photo save failed (non-quota error)', e);
+    }
+  }
 }
 function getJobPhotos(id){ return photoStore[id]||[]; }
 function setJobPhotos(id, photos){ photoStore[id]=photos; savePhotos(); }
