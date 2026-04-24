@@ -310,6 +310,17 @@ label { font-size: 13px; font-weight: 600; color: var(--text2); display: block; 
           <div><label>Other costs ($)</label><div class="prefix"><span>$</span><input type="number" id="otherCosts" placeholder="0" onchange="saveOther()"/></div></div>
         </div>
         <textarea id="otherNotes" rows="2" placeholder="Hardware, finish, delivery..." onchange="saveOther()"></textarea>
+        <div class="slabel">Deposit</div>
+        <div class="row2">
+          <div>
+            <label>Deposit amount ($)</label>
+            <div class="prefix"><span>$</span><input type="number" id="depositAmt" placeholder="0" step="0.01" onchange="saveDeposit()"/></div>
+          </div>
+          <div>
+            <label>Date received</label>
+            <input type="date" id="depositDate" onchange="saveDeposit()"/>
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -812,7 +823,9 @@ function calcEst(job){
   const afterMarkup=sub+markup;
   const tax=afterMarkup*(parseFloat(job.salesTaxPct??settings.salesTaxPct??0)/100);
   const total=afterMarkup+tax;
-  return {matTotal,miscTotal,laborTotal,other,sub,markup,tax,total,rate};
+  const deposit=parseFloat(job.depositAmt||0);
+  const balance=Math.max(0,total-deposit);
+  return {matTotal,miscTotal,laborTotal,other,sub,markup,tax,total,rate,deposit,balance};
 }
 function renderEstimate(){
   const j=getJob(); const e=calcEst(j);
@@ -829,6 +842,8 @@ function renderEstimate(){
       ${parseFloat(j.markupPct??settings.markupPct??0)>0?`<div class="cost-line"><span>Markup (${j.markupPct??settings.markupPct}%)</span><span>${fmt(e.markup)}</span></div>`:''}
       ${parseFloat(j.salesTaxPct??settings.salesTaxPct??0)>0?`<div class="cost-line"><span>Sales tax (${j.salesTaxPct??settings.salesTaxPct}%)</span><span>${fmt(e.tax)}</span></div>`:''}
       <div class="cost-line total"><span>Total</span><span>${fmt(e.total)}</span></div>
+      ${e.deposit>0?`<div class="cost-line" style="color:var(--text2)"><span>Deposit received${j.depositDate?' ('+j.depositDate+')':''}</span><span style="color:var(--green)">-${fmt(e.deposit)}</span></div>`:'' }
+      ${e.deposit>0?`<div class="cost-line total" style="border-top:2px solid var(--wood)"><span>Balance due</span><span>${fmt(e.balance)}</span></div>`:'' }
     </div>`;
   document.getElementById('matList').innerHTML=(j.materials||[]).length?
     (j.materials||[]).map((m,i)=>`<div class="mat-card">
@@ -847,6 +862,8 @@ function renderEstimate(){
   document.getElementById('salesTaxPct').value=j.salesTaxPct??settings.salesTaxPct;
   document.getElementById('otherCosts').value=j.otherCosts||'';
   document.getElementById('otherNotes').value=j.otherNotes||'';
+  document.getElementById('depositAmt').value=j.depositAmt||'';
+  document.getElementById('depositDate').value=j.depositDate||'';
   // Misc materials
   const miscEl=document.getElementById('miscMatList');
   miscEl.innerHTML=(j.miscMaterials||[]).length?
@@ -877,6 +894,7 @@ function saveLaborRate(){ const j=getJob(); j.laborRate=parseFloat(document.getE
 function saveMarkup(){ const j=getJob(); j.markupPct=parseFloat(document.getElementById('markupPct').value)||0; save(); renderEstimate(); }
 function saveSalesTax(){ const j=getJob(); j.salesTaxPct=parseFloat(document.getElementById('salesTaxPct').value)||0; save(); renderEstimate(); }
 function saveOther(){ const j=getJob(); j.otherCosts=parseFloat(document.getElementById('otherCosts').value)||0; j.otherNotes=document.getElementById('otherNotes').value; save(); renderEstimate(); }
+function saveDeposit(){ const j=getJob(); j.depositAmt=parseFloat(document.getElementById('depositAmt').value)||0; j.depositDate=document.getElementById('depositDate').value||''; save(); renderEstimate(); }
 function delMat(i){ const j=getJob(); j.materials.splice(i,1); save(); renderEstimate(); }
 function delMisc(i){ const j=getJob(); j.miscMaterials.splice(i,1); save(); renderEstimate(); }
 function delLabor(i){ const j=getJob(); j.labor.splice(i,1); save(); renderEstimate(); }
@@ -905,6 +923,11 @@ function buildShareText(job){
   lines.push('───────────────────────────');
   if(parseFloat(job.markupPct||0)>0){ lines.push('Subtotal            '+fmt(e.sub),'Markup ('+job.markupPct+'%)       '+fmt(e.markup)); }
   lines.push('TOTAL               '+fmt(e.total),'═══════════════════════════');
+  if(e.deposit>0){
+    lines.push('Deposit received    '+fmt(e.deposit));
+    if(job.depositDate) lines.push('Deposit date        '+job.depositDate);
+    lines.push('BALANCE DUE         '+fmt(e.balance),'═══════════════════════════');
+  }
   if((job.cuts||[]).length){
     lines.push('','CUT LIST','───────────────────────────');
     (job.cuts||[]).forEach(c=>{ lines.push((c.done?'[x] ':'[ ] ')+c.label+(c.material?' ('+c.material+')':'')); lines.push('    '+c.t+'" x '+c.w+'" x '+c.l+'"'+(c.qty>1?' x'+c.qty:'')); });
