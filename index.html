@@ -1157,6 +1157,14 @@ function showSettingsModal(){
       <div style="flex:2;font-size:14px;font-weight:600;color:var(--text);padding-top:4px">${name}</div>
       <div style="flex:1"><div class="prefix"><span>$</span><input type="number" class="lumber-price-input" data-species="${name}" value="${price}" step="0.50" style="margin-bottom:6px"/></div></div>
     </div>`).join('')}
+    <div class="slabel" style="margin-top:18px">Data backup</div>
+    <div style="font-size:12px;color:var(--text3);margin-bottom:10px">Export all jobs, photos, and settings to a file. Import to restore on any device.</div>
+    <div style="display:flex;gap:10px;margin-bottom:6px">
+      <button class="btn btn-secondary" style="flex:1" onclick="exportData()">&#8595; Export data</button>
+      <button class="btn btn-secondary" style="flex:1" onclick="document.getElementById('importFile').click()">&#8593; Import data</button>
+    </div>
+    <input type="file" id="importFile" accept=".json" style="display:none" onchange="importData(event)"/>
+    <div id="importStatus" style="font-size:13px;font-weight:600;color:var(--green);text-align:center;min-height:20px"></div>
     <div class="modal-btns" style="margin-top:12px">
       <button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
       <button class="btn btn-primary" onclick="saveSettingsModal()">Save Settings</button>
@@ -1175,6 +1183,47 @@ function saveSettingsModal(){
   saveSettings();
   closeModal();
   showToast('Settings saved');
+}
+
+// DATA EXPORT / IMPORT
+function exportData(){
+  const payload = {
+    version: 1,
+    exportedAt: new Date().toISOString(),
+    jobs: JSON.parse(localStorage.getItem(JOBS_KEY)||'[]'),
+    photos: JSON.parse(localStorage.getItem(PHOTOS_KEY)||'{}'),
+    settings: JSON.parse(localStorage.getItem(SETTINGS_KEY)||'{}')
+  };
+  const blob = new Blob([JSON.stringify(payload, null, 2)], {type:'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  const date = new Date().toISOString().split('T')[0];
+  a.href = url; a.download = 'shopkeeper-backup-'+date+'.json';
+  document.body.appendChild(a); a.click();
+  document.body.removeChild(a); URL.revokeObjectURL(url);
+  showToast('Data exported!');
+}
+function importData(event){
+  const file = event.target.files[0]; if(!file) return;
+  const reader = new FileReader();
+  reader.onload = function(e){
+    try{
+      const payload = JSON.parse(e.target.result);
+      if(!payload.version || !Array.isArray(payload.jobs)) throw new Error('Invalid file');
+      if(!confirm('This will replace ALL current data. Are you sure?')){ event.target.value=''; return; }
+      if(payload.jobs)     localStorage.setItem(JOBS_KEY,     JSON.stringify(payload.jobs));
+      if(payload.photos)   localStorage.setItem(PHOTOS_KEY,   JSON.stringify(payload.photos));
+      if(payload.settings) localStorage.setItem(SETTINGS_KEY, JSON.stringify(payload.settings));
+      const st = document.getElementById('importStatus');
+      if(st) st.textContent = 'Import successful — reloading...';
+      setTimeout(()=>location.reload(), 1200);
+    } catch(err){
+      const st = document.getElementById('importStatus');
+      if(st){ st.style.color='var(--red)'; st.textContent='Error: '+err.message; }
+    }
+  };
+  reader.readAsText(file);
+  event.target.value='';
 }
 
 // ── GOOGLE CALENDAR SYNC ──
