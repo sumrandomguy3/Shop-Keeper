@@ -414,6 +414,9 @@ try{ photoStore=JSON.parse(localStorage.getItem(PHOTOS_KEY)||'{}'); }catch(e){ p
 // Migrate old data: if jobs have photos embedded, move them out
 let migrated=false;
 jobs.forEach(j=>{
+  (j.miscMaterials||[]).forEach(m=>{
+    if(m.unitPrice==null && m.cost!=null){ m.qty=1; m.unitPrice=m.cost; delete m.cost; migrated=true; }
+  });
   if(j.photos && j.photos.length){
     photoStore[j.id]=j.photos;
     j.photos=[];
@@ -858,9 +861,15 @@ function closeLightbox(){
 }
 
 // ESTIMATE
+// Material line helpers — wood is board-foot or by-unit; misc is qty x unit price (legacy items use .cost)
+function unitDesc(qty, price, unit){ return (parseFloat(qty)||0)+' × '+fmt(price)+(unit?' /'+unit:''); }
+function matLineTotal(m){ return m.mode==='unit' ? (parseFloat(m.qty)||0)*(parseFloat(m.unitPrice)||0) : (parseFloat(m.bf)||0)*(parseFloat(m.pricePerBf)||0); }
+function matLineDesc(m){ return m.mode==='unit' ? unitDesc(m.qty,m.unitPrice,m.unit) : (parseFloat(m.bf)||0).toFixed(2)+' bf × '+fmt(m.pricePerBf)+'/bf'; }
+function miscLineTotal(m){ return m.unitPrice!=null ? (parseFloat(m.qty)||0)*(parseFloat(m.unitPrice)||0) : (parseFloat(m.cost)||0); }
+function miscLineDesc(m){ return m.unitPrice!=null ? unitDesc(m.qty,m.unitPrice,m.unit) : null; }
 function calcEst(job){
-  const matTotal=(job.materials||[]).reduce((s,m)=>s+(m.bf*m.pricePerBf),0);
-  const miscTotal=(job.miscMaterials||[]).reduce((s,m)=>s+m.cost,0);
+  const matTotal=(job.materials||[]).reduce((s,m)=>s+matLineTotal(m),0);
+  const miscTotal=(job.miscMaterials||[]).reduce((s,m)=>s+miscLineTotal(m),0);
   const rate=parseFloat(job.laborRate||settings.laborRate||65);
   const laborTotal=(job.labor||[]).reduce((s,l)=>s+(l.hours*rate),0);
   const other=parseFloat(job.otherCosts||0);
@@ -895,12 +904,13 @@ function renderEstimate(){
     (j.materials||[]).map((m,i)=>`<div class="mat-card">
       <div style="display:flex;justify-content:space-between;align-items:center">
         <div style="font-size:15px;font-weight:700;color:var(--text)">${m.name}</div>
-        <div style="display:flex;align-items:center;gap:8px">
-          <span style="font-size:15px;font-weight:700;color:var(--wood)">${fmt(m.bf*m.pricePerBf)}</span>
+        <div style="display:flex;align-items:center;gap:4px">
+          <span style="font-size:15px;font-weight:700;color:var(--wood)">${fmt(matLineTotal(m))}</span>
+          <button class="btn-icon" onclick="showEditMatModal(${i})" title="Edit">&#9998;</button>
           <button class="btn-icon" onclick="delMat(${i})">&#10005;</button>
         </div>
       </div>
-      <div style="font-size:13px;font-weight:500;color:var(--text2);margin-top:3px">${m.bf.toFixed(2)} bf × ${fmt(m.pricePerBf)}/bf</div>
+      <div style="font-size:13px;font-weight:500;color:var(--text2);margin-top:3px">${matLineDesc(m)}</div>
     </div>`).join('')
     :`<div style="color:var(--text3);font-size:14px;font-weight:500;margin-bottom:12px">No materials yet.</div>`;
   document.getElementById('laborRate').value=j.laborRate??settings.laborRate;
@@ -916,11 +926,13 @@ function renderEstimate(){
     (j.miscMaterials||[]).map((m,i)=>`<div class="mat-card">
       <div style="display:flex;justify-content:space-between;align-items:center">
         <div style="font-size:15px;font-weight:600;color:var(--text)">${m.name}</div>
-        <div style="display:flex;align-items:center;gap:8px">
-          <span style="font-size:15px;font-weight:700;color:var(--wood)">${fmt(m.cost)}</span>
+        <div style="display:flex;align-items:center;gap:4px">
+          <span style="font-size:15px;font-weight:700;color:var(--wood)">${fmt(miscLineTotal(m))}</span>
+          <button class="btn-icon" onclick="showEditMiscModal(${i})" title="Edit">&#9998;</button>
           <button class="btn-icon" onclick="delMisc(${i})">&#10005;</button>
         </div>
       </div>
+      ${miscLineDesc(m)?`<div style="font-size:13px;font-weight:500;color:var(--text2);margin-top:3px">${miscLineDesc(m)}</div>`:''}
       ${m.note?`<div style="font-size:12px;color:var(--text2);margin-top:2px">${m.note}</div>`:''}
     </div>`).join('')
     :`<div style="color:var(--text3);font-size:14px;font-weight:500;margin-bottom:12px">No misc materials yet.</div>`;
@@ -961,7 +973,7 @@ function buildShareText(job, itemized){
   if(itemized){
     if((job.materials||[]).length){
       lines.push('MATERIALS','───────────────────────────');
-      (job.materials||[]).forEach(m=>{ lines.push('  '+m.name.padEnd(16)+fmt(m.bf*m.pricePerBf)); lines.push('  ('+m.bf.toFixed(2)+' bf @ '+fmt(m.pricePerBf)+'/bf)'); });
+      (job.materials||[]).forEach(m=>{ lines.push('  '+m.name.padEnd(16)+fmt(matLineTotal(m))); lines.push('  ('+matLineDesc(m)+')'); });
       lines.push('  Subtotal         '+fmt(e.matTotal),'');
     }
     if((job.labor||[]).length){
@@ -971,7 +983,7 @@ function buildShareText(job, itemized){
     }
     if((job.miscMaterials||[]).length){
       lines.push('MISC MATERIALS','───────────────────────────');
-      (job.miscMaterials||[]).forEach(m=>{ lines.push('  '+m.name.padEnd(16)+fmt(m.cost)); });
+      (job.miscMaterials||[]).forEach(m=>{ const d=miscLineDesc(m); lines.push('  '+m.name.padEnd(16)+fmt(miscLineTotal(m))); if(d) lines.push('  ('+d+')'); });
       lines.push('  Subtotal         '+fmt(e.miscTotal),'');
     }
     if(e.other>0){ lines.push('OTHER COSTS','───────────────────────────','  Other             '+fmt(e.other),''); }
@@ -1133,33 +1145,71 @@ function addCut(){
   save(); closeModal(); renderCutList();
 }
 
-function showAddMatModal(){
+function showAddMatModal(){ matModal(null); }
+function showEditMatModal(i){ matModal(i); }
+function matModal(editIndex){
   const j=getJob(); const bfTotal=(j.bfLog||[]).reduce((s,b)=>s+b.bf,0);
   const presets=getLumberPresets();
+  const m = editIndex!=null ? (j.materials||[])[editIndex] : null;
+  const isUnit = m ? m.mode==='unit' : false;
+  const mode = isUnit ? 'unit' : 'bf';
   document.getElementById('modalInner').innerHTML=`
-    <div class="modal-title">Add Material</div>
-    <label>Species *</label>
-    <div class="chips">${presets.map(p=>`<div class="chip" onclick="fillPreset('${p.name}',${p.price})">${p.name} <span style="opacity:0.6;font-size:11px">${fmt(p.price)}/bf</span></div>`).join('')}</div>
-    <input id="mMName" type="text" placeholder="e.g. White Oak"/>
-    <label>Price per board foot ($) *</label>
-    <div class="prefix"><span>$</span><input id="mMPrice" type="number" placeholder="9.00" step="0.5"/></div>
-    <label>Board feet *</label>
-    ${bfTotal>0?`<div style="font-size:13px;font-weight:600;color:var(--text2);margin-bottom:8px">From log: ${bfTotal.toFixed(2)} bf total</div>`:''}
-    <input id="mMBF" type="number" placeholder="${bfTotal>0?bfTotal.toFixed(2):'0'}" step="0.25"/>
+    <div class="modal-title">${m?'Edit':'Add'} Material</div>
+    <div class="seg-toggle">
+      <button id="matModeBf" onclick="setMatMode('bf')">Board feet</button>
+      <button id="matModeUnit" onclick="setMatMode('unit')">By unit</button>
+    </div>
+    <label>Name *</label>
+    <div class="chips" id="matChips">${presets.map(p=>`<div class="chip" onclick="fillPreset('${p.name}',${p.price})">${p.name} <span style="opacity:0.6;font-size:11px">${fmt(p.price)}/bf</span></div>`).join('')}</div>
+    <input id="mMName" type="text" placeholder="e.g. White Oak" value="${m?m.name.replace(/"/g,'&quot;'):''}"/>
+    <div id="matBfFields">
+      <label>Price per board foot ($) *</label>
+      <div class="prefix"><span>$</span><input id="mMPrice" type="number" placeholder="9.00" step="0.5" value="${m&&!isUnit?(m.pricePerBf??''):''}"/></div>
+      <label>Board feet *</label>
+      ${bfTotal>0&&!m?`<div style="font-size:13px;font-weight:600;color:var(--text2);margin-bottom:8px">From log: ${bfTotal.toFixed(2)} bf total</div>`:''}
+      <input id="mMBF" type="number" placeholder="${bfTotal>0?bfTotal.toFixed(2):'0'}" step="0.25" value="${m&&!isUnit?(m.bf??''):''}"/>
+    </div>
+    <div id="matUnitFields" style="display:none">
+      <div class="row2">
+        <div><label>Quantity *</label><input id="mMQty" type="number" placeholder="3" step="1" value="${m&&isUnit?(m.qty??''):''}"/></div>
+        <div><label>Unit label</label><input id="mMUnit" type="text" placeholder="sheet" value="${m&&isUnit?((m.unit||'').replace(/"/g,'&quot;')):''}"/></div>
+      </div>
+      <label>Price per unit ($) *</label>
+      <div class="prefix"><span>$</span><input id="mMUnitPrice" type="number" placeholder="45.00" step="0.5" value="${m&&isUnit?(m.unitPrice??''):''}"/></div>
+    </div>
     <div class="modal-btns">
       <button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
-      <button class="btn btn-primary" onclick="addMat()">Add</button>
+      <button class="btn btn-primary" onclick="saveMat(${editIndex==null?'null':editIndex})">${m?'Save':'Add'}</button>
     </div>`;
   openModal();
+  setMatMode(mode);
+}
+function setMatMode(mode){
+  window._matMode=mode;
+  document.getElementById('matBfFields').style.display = mode==='bf'?'block':'none';
+  document.getElementById('matUnitFields').style.display = mode==='unit'?'block':'none';
+  document.getElementById('matChips').style.display = mode==='bf'?'flex':'none';
+  document.getElementById('matModeBf').classList.toggle('active',mode==='bf');
+  document.getElementById('matModeUnit').classList.toggle('active',mode==='unit');
 }
 function fillPreset(n,p){ document.getElementById('mMName').value=n; document.getElementById('mMPrice').value=p; }
-function addMat(){
-  const name=document.getElementById('mMName').value.trim();
-  const price=parseFloat(document.getElementById('mMPrice').value);
-  const bf=parseFloat(document.getElementById('mMBF').value);
-  if(!name||!price||!bf){ alert('Fill in all fields.'); return; }
+function saveMat(editIndex){
   const j=getJob(); if(!j.materials) j.materials=[];
-  j.materials.push({name,pricePerBf:price,bf});
+  const name=document.getElementById('mMName').value.trim();
+  if(!name){ alert('Enter a material name.'); return; }
+  let mat;
+  if(window._matMode==='unit'){
+    const qty=parseFloat(document.getElementById('mMQty').value);
+    const unitPrice=parseFloat(document.getElementById('mMUnitPrice').value);
+    if(!qty||!unitPrice){ alert('Enter quantity and price per unit.'); return; }
+    mat={name, mode:'unit', qty, unitPrice, unit:document.getElementById('mMUnit').value.trim()};
+  } else {
+    const price=parseFloat(document.getElementById('mMPrice').value);
+    const bf=parseFloat(document.getElementById('mMBF').value);
+    if(!price||!bf){ alert('Enter price per board foot and board feet.'); return; }
+    mat={name, mode:'bf', pricePerBf:price, bf};
+  }
+  if(editIndex==null) j.materials.push(mat); else j.materials[editIndex]=mat;
   save(); closeModal(); renderEstimate();
 }
 function showAddLaborModal(){
@@ -1182,25 +1232,37 @@ function addLabor(){
   save(); closeModal(); renderEstimate();
 }
 
-function showAddMiscModal(){
+function showAddMiscModal(){ miscModal(null); }
+function showEditMiscModal(i){ miscModal(i); }
+function miscModal(editIndex){
+  const j=getJob();
+  const m = editIndex!=null ? (j.miscMaterials||[])[editIndex] : null;
+  const qtyVal   = m ? (m.unitPrice!=null ? (m.qty??'') : 1) : '';
+  const priceVal = m ? (m.unitPrice!=null ? m.unitPrice : (m.cost??'')) : '';
   document.getElementById('modalInner').innerHTML=`
-    <div class="modal-title">Add Misc Material</div>
-    <label>Item name *</label><input id="mmName" type="text" placeholder="e.g. Sandpaper, Wood glue, Stain..."/>
-    <label>Cost ($) *</label>
-    <div class="prefix"><span>$</span><input id="mmCost" type="number" placeholder="0.00" step="0.50"/></div>
-    <label>Note</label><input id="mmNote" type="text" placeholder="Optional note"/>
+    <div class="modal-title">${m?'Edit':'Add'} Misc Material</div>
+    <label>Item name *</label><input id="mmName" type="text" placeholder="e.g. Bolts, Sandpaper, Stain..." value="${m?m.name.replace(/"/g,'&quot;'):''}"/>
+    <div class="row2">
+      <div><label>Quantity *</label><input id="mmQty" type="number" placeholder="1" step="1" value="${qtyVal}"/></div>
+      <div><label>Unit label</label><input id="mmUnit" type="text" placeholder="bolt" value="${m&&m.unit?m.unit.replace(/"/g,'&quot;'):''}"/></div>
+    </div>
+    <label>Price per unit ($) *</label>
+    <div class="prefix"><span>$</span><input id="mmPrice" type="number" placeholder="0.50" step="0.25" value="${priceVal}"/></div>
+    <label>Note</label><input id="mmNote" type="text" placeholder="Optional note" value="${m&&m.note?m.note.replace(/"/g,'&quot;'):''}"/>
     <div class="modal-btns">
       <button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
-      <button class="btn btn-primary" onclick="addMisc()">Add</button>
+      <button class="btn btn-primary" onclick="saveMisc(${editIndex==null?'null':editIndex})">${m?'Save':'Add'}</button>
     </div>`;
   openModal();
 }
-function addMisc(){
-  const name=document.getElementById('mmName').value.trim();
-  const cost=parseFloat(document.getElementById('mmCost').value);
-  if(!name||!cost){ alert('Enter a name and cost.'); return; }
+function saveMisc(editIndex){
   const j=getJob(); if(!j.miscMaterials) j.miscMaterials=[];
-  j.miscMaterials.push({name, cost, note:document.getElementById('mmNote').value.trim()});
+  const name=document.getElementById('mmName').value.trim();
+  const qty=parseFloat(document.getElementById('mmQty').value);
+  const unitPrice=parseFloat(document.getElementById('mmPrice').value);
+  if(!name||!qty||!unitPrice){ alert('Enter name, quantity, and price per unit.'); return; }
+  const item={name, qty, unitPrice, unit:document.getElementById('mmUnit').value.trim(), note:document.getElementById('mmNote').value.trim()};
+  if(editIndex==null) j.miscMaterials.push(item); else j.miscMaterials[editIndex]=item;
   save(); closeModal(); renderEstimate();
 }
 
