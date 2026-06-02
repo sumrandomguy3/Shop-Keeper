@@ -122,7 +122,7 @@ label { font-size: 13px; font-weight: 600; color: var(--text2); display: block; 
 .photo-thumb .photo-img-wrap { aspect-ratio: 1; overflow: hidden; }
 .photo-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; transition: opacity 0.15s; }
 .photo-thumb:active img { opacity: 0.8; }
-.photo-note-bar { padding: 5px 7px 6px; background: var(--bg2); font-size: 11px; font-weight: 500; color: var(--text2); line-height: 1.3; border-top: 1px solid var(--border); min-height: 28px; display: flex; align-items: center; }
+.photo-note-bar { padding: 0 8px; background: var(--bg2); font-size: 11px; font-weight: 500; color: var(--text2); border-top: 1px solid var(--border); height: 30px; line-height: 30px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .photo-note-bar.empty { color: var(--text3); font-style: italic; }
 .photo-del { position: absolute; top: 4px; right: 4px; background: rgba(0,0,0,0.65); color: #fff; border: none; border-radius: 50%; width: 24px; height: 24px; font-size: 13px; cursor: pointer; display: flex; align-items: center; justify-content: center; z-index: 2; }
 .photo-add { aspect-ratio: 1; border-radius: var(--radius); border: 2px dashed var(--border2); display: flex; flex-direction: column; align-items: center; justify-content: center; cursor: pointer; color: var(--text3); font-size: 12px; font-weight: 600; gap: 5px; background: var(--bg2); }
@@ -180,6 +180,9 @@ label { font-size: 13px; font-weight: 600; color: var(--text2); display: block; 
 .chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
 .chip { font-size: 13px; font-weight: 600; padding: 6px 12px; border-radius: 20px; border: 1px solid var(--border2); cursor: pointer; color: var(--text2); background: var(--bg2); }
 .chip:active { background: var(--tan-light); color: var(--tan-dark); }
+.seg-toggle { display: flex; margin-bottom: 14px; border: 1px solid var(--border2); border-radius: var(--radius); overflow: hidden; }
+.seg-toggle button { flex: 1; padding: 9px; background: var(--bg2); color: var(--text2); border: none; font-size: 13px; font-weight: 600; cursor: pointer; }
+.seg-toggle button.active { background: var(--wood); color: #fff; }
 .share-pre { background: var(--bg2); border-radius: var(--radius); padding: 14px; font-size: 12px; line-height: 1.7; color: var(--text); white-space: pre-wrap; font-family: monospace; max-height: 260px; overflow-y: auto; border: 1px solid var(--border2); margin-bottom: 14px; }
 .copy-ok { font-size: 13px; font-weight: 600; color: var(--green); text-align: center; margin-top: 8px; height: 18px; }
 .empty { text-align: center; padding: 48px 20px; color: var(--text2); font-size: 15px; font-weight: 500; }
@@ -441,7 +444,7 @@ function urgColor(u){ return u==='urgent'?'var(--red)':u==='warning'?'var(--oran
 function urgency(job){
   if(!job.dueDate||isArchived(job)) return null;
   const diff=Math.round((new Date(job.dueDate+'T00:00:00')-today)/86400000);
-  if(diff<0||diff<=3) return 'urgent';
+  if(diff<=3) return 'urgent';
   if(diff<=7) return 'warning';
   if(diff<=14) return 'soon';
   return 'ok';
@@ -471,16 +474,8 @@ function changeStatus(id,val,e){
   const wasArchived=isArchived(j);
   j.status=val;
   save();
-  const nowArchived=isArchived(j);
-  // Show toast if moving between states
-  if(!wasArchived && nowArchived){
-    showToast('Moved to Archive');
-    if(j.gcalEventId){ gcalDeleteEvent(j.gcalEventId); j.gcalEventId=null; save(); }
-  }
-  if(wasArchived && !nowArchived){ showToast('Restored to Jobs'); gcalSyncJob(j); }
-  if(!wasArchived && !nowArchived){ gcalSyncJob(j); }
-  renderJobList();
-  renderArchiveList();
+  applyStatusSideEffects(j, wasArchived);
+  renderLists();
 }
 
 function showToast(msg){
@@ -591,6 +586,19 @@ function renderArchiveList(){
   if(!archived.length){ el.innerHTML=`<div class="empty"><div class="empty-icon">&#128230;</div>No archived jobs yet.<br>Completed and declined jobs will appear here.</div>`; return; }
   el.innerHTML=archived.map(j=>jobCardHtml(j,true)).join('');
 }
+function renderLists(){ renderJobList(); renderArchiveList(); }
+// Shared toast + Google Calendar handling when a job's archive state may have changed
+function applyStatusSideEffects(j, wasArchived){
+  const nowArchived=isArchived(j);
+  if(!wasArchived && nowArchived){
+    showToast('Moved to Archive');
+    if(j.gcalEventId){ gcalDeleteEvent(j.gcalEventId); j.gcalEventId=null; save(); }
+  } else if(wasArchived && !nowArchived){
+    showToast('Restored to Jobs'); gcalSyncJob(j);
+  } else if(!wasArchived && !nowArchived){
+    gcalSyncJob(j);
+  }
+}
 function deleteJob(id){
   const j=jobs.find(jb=>jb.id===id); if(!j) return;
   document.getElementById('modalInner').innerHTML=`
@@ -606,7 +614,7 @@ function deleteJob(id){
 function confirmDeleteJob(id){
   const j=jobs.find(jb=>jb.id===id);
   if(j && j.gcalEventId) gcalDeleteEvent(j.gcalEventId);
-  jobs=jobs.filter(j=>j.id!==id); save(); closeModal(); renderJobList(); renderArchiveList();
+  jobs=jobs.filter(j=>j.id!==id); save(); closeModal(); renderLists();
 }
 
 // CALENDAR — show active jobs only on main dots, all in list
@@ -740,21 +748,46 @@ function renderPhotos(){
     </div>`;
   document.getElementById('photoGrid').innerHTML=html;
 }
-function handlePhoto(e){
-  const files=Array.from(e.target.files); if(!files.length) return;
+// Downscale + re-encode so photos fit in localStorage (full-res base64 blows the ~5MB quota)
+function compressImage(file){
+  return new Promise(resolve=>{
+    const MAX=1600, Q=0.72;
+    const finish=canvas=>{ try{ resolve(canvas.toDataURL('image/jpeg',Q)); }catch(err){ resolve(null); } };
+    const draw=(srcImg,w,h)=>{
+      let nw=w, nh=h;
+      if(w>=h && w>MAX){ nh=Math.round(h*MAX/w); nw=MAX; }
+      else if(h>w && h>MAX){ nw=Math.round(w*MAX/h); nh=MAX; }
+      const c=document.createElement('canvas'); c.width=nw; c.height=nh;
+      c.getContext('2d').drawImage(srcImg,0,0,nw,nh);
+      finish(c);
+    };
+    const fallback=()=>{
+      const reader=new FileReader();
+      reader.onload=ev=>{ const img=new Image(); img.onload=()=>draw(img,img.naturalWidth,img.naturalHeight); img.onerror=()=>resolve(null); img.src=ev.target.result; };
+      reader.onerror=()=>resolve(null);
+      reader.readAsDataURL(file);
+    };
+    if(window.createImageBitmap){
+      createImageBitmap(file,{imageOrientation:'from-image'}).then(bmp=>{ draw(bmp,bmp.width,bmp.height); if(bmp.close) bmp.close(); }).catch(fallback);
+    } else { fallback(); }
+  });
+}
+async function handlePhoto(e){
+  const files=Array.from(e.target.files); e.target.value='';
+  if(!files.length) return;
   const j=getJob();
   const photos=getJobPhotos(j.id);
-  let loaded=0;
-  files.forEach(file=>{
-    const reader=new FileReader();
-    reader.onload=ev=>{
-      photos.unshift({src:ev.target.result, note:'', date:new Date().toLocaleDateString()});
-      loaded++;
-      if(loaded===files.length){ setJobPhotos(j.id,photos); renderPhotos(); if(files.length===1) openLightbox(0); }
-    };
-    reader.readAsDataURL(file);
-  });
-  e.target.value='';
+  let added=0;
+  for(const file of files){
+    const src=await compressImage(file);
+    if(!src) continue;
+    photos.unshift({src, note:'', date:new Date().toLocaleDateString()});
+    added++;
+  }
+  if(!added){ showToast('Could not read photo'); return; }
+  setJobPhotos(j.id,photos);
+  renderPhotos();
+  if(added===1) openLightbox(0);
 }
 function deletePhoto(i){
   const j=getJob(); const photos=getJobPhotos(j.id);
@@ -888,7 +921,7 @@ function renderEstimate(){
       ${m.note?`<div style="font-size:12px;color:var(--text2);margin-top:2px">${m.note}</div>`:''}
     </div>`).join('')
     :`<div style="color:var(--text3);font-size:14px;font-weight:500;margin-bottom:12px">No misc materials yet.</div>`;
-  const rate=parseFloat(j.laborRate||65);
+  const rate=parseFloat(j.laborRate||settings.laborRate||65);
   document.getElementById('laborList').innerHTML=(j.labor||[]).length?
     (j.labor||[]).map((l,i)=>`<div class="labor-row">
       <div style="flex:1">
@@ -910,8 +943,11 @@ function delMisc(i){ const j=getJob(); j.miscMaterials.splice(i,1); save(); rend
 function delLabor(i){ const j=getJob(); j.labor.splice(i,1); save(); renderEstimate(); }
 
 // SHARE
-function buildShareText(job){
+function buildShareText(job, itemized){
+  if(itemized===undefined) itemized=true;
   const e=calcEst(job); const si=sInfo(job.status||'inquiry');
+  const markupPct=parseFloat(job.markupPct??settings.markupPct??0);
+  const taxPct=parseFloat(job.salesTaxPct??settings.salesTaxPct??0);
   const date=new Date().toLocaleDateString('en-US',{year:'numeric',month:'long',day:'numeric'});
   const lines=['═══════════════════════════','  ESTIMATE','═══════════════════════════','Job:    '+job.name];
   if(job.client) lines.push('Client: '+job.client);
@@ -919,26 +955,42 @@ function buildShareText(job){
   if(job.startDate) lines.push('Start:  '+job.startDate);
   if(job.dueDate)   lines.push('Due:    '+job.dueDate);
   lines.push('');
-  if((job.materials||[]).length){
-    lines.push('MATERIALS','───────────────────────────');
-    (job.materials||[]).forEach(m=>{ lines.push('  '+m.name.padEnd(16)+fmt(m.bf*m.pricePerBf)); lines.push('  ('+m.bf.toFixed(2)+' bf @ '+fmt(m.pricePerBf)+'/bf)'); });
-    lines.push('  Subtotal         '+fmt(e.matTotal),'');
+  if(itemized){
+    if((job.materials||[]).length){
+      lines.push('MATERIALS','───────────────────────────');
+      (job.materials||[]).forEach(m=>{ lines.push('  '+m.name.padEnd(16)+fmt(m.bf*m.pricePerBf)); lines.push('  ('+m.bf.toFixed(2)+' bf @ '+fmt(m.pricePerBf)+'/bf)'); });
+      lines.push('  Subtotal         '+fmt(e.matTotal),'');
+    }
+    if((job.labor||[]).length){
+      lines.push('LABOR  (@ '+fmt(e.rate)+'/hr)','───────────────────────────');
+      (job.labor||[]).forEach(l=>{ lines.push('  '+l.desc.padEnd(16)+fmt(l.hours*e.rate)); lines.push('  ('+l.hours+' hrs)'); });
+      lines.push('  Subtotal         '+fmt(e.laborTotal),'');
+    }
+    if((job.miscMaterials||[]).length){
+      lines.push('MISC MATERIALS','───────────────────────────');
+      (job.miscMaterials||[]).forEach(m=>{ lines.push('  '+m.name.padEnd(16)+fmt(m.cost)); });
+      lines.push('  Subtotal         '+fmt(e.miscTotal),'');
+    }
+    if(e.other>0){ lines.push('OTHER COSTS','───────────────────────────','  Other             '+fmt(e.other),''); }
+  } else {
+    lines.push('SUMMARY','───────────────────────────');
+    if(e.matTotal>0)   lines.push('  Materials        '+fmt(e.matTotal));
+    if(e.miscTotal>0)  lines.push('  Misc materials   '+fmt(e.miscTotal));
+    if(e.laborTotal>0) lines.push('  Labor            '+fmt(e.laborTotal));
+    if(e.other>0)      lines.push('  Other            '+fmt(e.other));
+    lines.push('');
   }
-  if((job.labor||[]).length){
-    lines.push('LABOR  (@ '+fmt(e.rate)+'/hr)','───────────────────────────');
-    (job.labor||[]).forEach(l=>{ lines.push('  '+l.desc.padEnd(16)+fmt(l.hours*e.rate)); lines.push('  ('+l.hours+' hrs)'); });
-    lines.push('  Subtotal         '+fmt(e.laborTotal),'');
-  }
-  if(e.other>0){ lines.push('OTHER COSTS','───────────────────────────','  Other             '+fmt(e.other),''); }
   lines.push('───────────────────────────');
-  if(parseFloat(job.markupPct||0)>0){ lines.push('Subtotal            '+fmt(e.sub),'Markup ('+job.markupPct+'%)       '+fmt(e.markup)); }
-  lines.push('TOTAL               '+fmt(e.total),'═══════════════════════════');
+  if(markupPct>0 || taxPct>0) lines.push('Subtotal'.padEnd(20)+fmt(e.sub));
+  if(markupPct>0) lines.push(('Markup ('+markupPct+'%)').padEnd(20)+fmt(e.markup));
+  if(taxPct>0)    lines.push(('Sales tax ('+taxPct+'%)').padEnd(20)+fmt(e.tax));
+  lines.push('TOTAL'.padEnd(20)+fmt(e.total),'═══════════════════════════');
   if(e.deposit>0){
     lines.push('Deposit received    '+fmt(e.deposit));
     if(job.depositDate) lines.push('Deposit date        '+job.depositDate);
     lines.push('BALANCE DUE         '+fmt(e.balance),'═══════════════════════════');
   }
-  if((job.cuts||[]).length){
+  if(itemized && (job.cuts||[]).length){
     lines.push('','CUT LIST','───────────────────────────');
     (job.cuts||[]).forEach(c=>{ lines.push((c.done?'[x] ':'[ ] ')+c.label+(c.material?' ('+c.material+')':'')); lines.push('    '+c.t+'" x '+c.w+'" x '+c.l+'"'+(c.qty>1?' x'+c.qty:'')); });
   }
@@ -946,9 +998,21 @@ function buildShareText(job){
   return lines.join('\n');
 }
 function showShareModal(){
-  const job=getJob(); const text=buildShareText(job); window._shareText=text;
+  if(window._shareItemized===undefined) window._shareItemized=true;
+  renderShareModal();
+  openModal();
+}
+function setShareItemized(v){ window._shareItemized=v; renderShareModal(); }
+function renderShareModal(){
+  const job=getJob();
+  const itemized=window._shareItemized!==false;
+  const text=buildShareText(job,itemized); window._shareText=text;
   document.getElementById('modalInner').innerHTML=`
     <div class="modal-title">Share Estimate</div>
+    <div class="seg-toggle">
+      <button class="${itemized?'active':''}" onclick="setShareItemized(true)">Itemized</button>
+      <button class="${!itemized?'active':''}" onclick="setShareItemized(false)">Summary</button>
+    </div>
     <div class="share-pre">${text.replace(/&/g,'&amp;').replace(/</g,'&lt;')}</div>
     <div style="display:flex;gap:10px">
       <button class="btn btn-secondary" style="flex:1" onclick="copyEst()">&#128203; Copy</button>
@@ -956,7 +1020,6 @@ function showShareModal(){
     </div>
     <div class="copy-ok" id="copyOk"></div>
     <button class="btn btn-secondary" onclick="closeModal()" style="width:100%;margin-top:10px">Done</button>`;
-  openModal();
 }
 function copyEst(){ navigator.clipboard.writeText(window._shareText||'').then(()=>{ const el=document.getElementById('copyOk'); el.textContent='Copied to clipboard!'; setTimeout(()=>el.textContent='',2500); }).catch(()=>{ document.getElementById('copyOk').textContent='Select text above to copy manually.'; }); }
 function shareEst(){ if(navigator.share) navigator.share({title:'Estimate',text:window._shareText||''}).catch(()=>{}); else copyEst(); }
@@ -1033,16 +1096,10 @@ function saveJob(id){
   j.dueDate=document.getElementById('eDue').value;
   j.notes=document.getElementById('eNotes').value.trim();
   save();
-  const nowArchived=isArchived(j);
-  if(!wasArchived && nowArchived){
-    showToast('Moved to Archive');
-    if(j.gcalEventId){ gcalDeleteEvent(j.gcalEventId); j.gcalEventId=null; save(); }
-  }
-  if(wasArchived && !nowArchived){ showToast('Restored to Jobs'); gcalSyncJob(j); }
-  if(!wasArchived && !nowArchived){ gcalSyncJob(j); }
+  applyStatusSideEffects(j, wasArchived);
   closeModal();
   if(currentJobId===id) document.getElementById('hTitle').textContent=j.name;
-  renderJobList(); renderArchiveList();
+  renderLists();
 }
 
 function showAddCutModal(){
@@ -1381,12 +1438,6 @@ async function gcalSyncAll() {
   gcalUpdateUI();
   showToast(`Synced ${active.length} job${active.length !== 1 ? 's' : ''} to Google Calendar`);
 }
-
-// HOOK GCAL INTO JOB ACTIONS
-
-// Patch addJob to sync after creation
-const _origAddJob = addJob;
-// We'll integrate directly below instead of patching
 
 // INIT
 gcalUpdateUI();
