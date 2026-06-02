@@ -213,11 +213,6 @@ label { font-size: 13px; font-weight: 600; color: var(--text2); display: block; 
     <button class="header-action" id="hAction" onclick="showAddJobModal()">+ Job</button>
     <button class="header-action" id="hSettings" onclick="showSettingsModal()" style="padding:7px 10px;margin-left:4px">&#9881;</button>
   </div>
-  <div class="gcal-bar" id="gcalBar">
-    <div class="gcal-dot disconnected" id="gcalDot"></div>
-    <div class="gcal-status" id="gcalStatus">Google Calendar — not connected</div>
-    <button class="gcal-btn" id="gcalBtn" onclick="gcalConnect()">Connect</button>
-  </div>
 
   <!-- ACTIVE JOBS -->
   <div id="viewList" style="flex:1;overflow-y:auto;display:flex;flex-direction:column">
@@ -1232,6 +1227,9 @@ function showSettingsModal(){
       <div style="flex:2;font-size:14px;font-weight:600;color:var(--text);padding-top:4px">${name}</div>
       <div style="flex:1"><div class="prefix"><span>$</span><input type="number" class="lumber-price-input" data-species="${name}" value="${price}" step="0.50" style="margin-bottom:6px"/></div></div>
     </div>`).join('')}
+    <div class="slabel">Google Calendar</div>
+    <div style="font-size:12px;color:var(--text3);margin-bottom:10px">Connect once to sync job due dates to your calendar. You can disconnect anytime.</div>
+    <div id="setGcalRow" style="display:flex;align-items:center;gap:10px;padding:12px 14px;background:var(--bg2);border:1px solid var(--border2);border-radius:var(--radius)"></div>
     <div class="slabel" style="margin-top:18px">Data backup</div>
     <div style="font-size:12px;color:var(--text3);margin-bottom:10px">Export all jobs, photos, and settings to a file. Import to restore on any device.</div>
     <div style="display:flex;gap:10px;margin-bottom:6px">
@@ -1245,6 +1243,7 @@ function showSettingsModal(){
       <button class="btn btn-primary" onclick="saveSettingsModal()">Save Settings</button>
     </div>`;
   openModal();
+  renderGcalSettingsRow();
 }
 function saveSettingsModal(){
   settings.laborRate=parseFloat(document.getElementById('sLaborRate').value)||65;
@@ -1325,22 +1324,13 @@ function gcalClearToken() {
 }
 function gcalIsConnected() { return gcalToken && Date.now() < gcalTokenExpiry; }
 
-function gcalUpdateUI() {
-  const dot = document.getElementById('gcalDot');
-  const status = document.getElementById('gcalStatus');
-  const btn = document.getElementById('gcalBtn');
-  if (!dot) return;
-  if (gcalIsConnected()) {
-    dot.className = 'gcal-dot connected';
-    status.textContent = 'Google Calendar — connected';
-    btn.textContent = 'Disconnect';
-    btn.onclick = gcalDisconnect;
-  } else {
-    dot.className = 'gcal-dot disconnected';
-    status.textContent = 'Google Calendar — not connected';
-    btn.textContent = 'Connect';
-    btn.onclick = gcalConnect;
-  }
+function renderGcalSettingsRow() {
+  const wrap = document.getElementById('setGcalRow');
+  if (!wrap) return;
+  const c = gcalIsConnected();
+  wrap.innerHTML = `<div class="gcal-dot ${c?'connected':'disconnected'}"></div>
+    <div class="gcal-status" style="flex:1">${c?'Connected':'Not connected'}</div>
+    <button class="gcal-btn" onclick="${c?'gcalDisconnect()':'gcalConnect()'}">${c?'Disconnect':'Connect'}</button>`;
 }
 
 function gcalConnect() {
@@ -1354,7 +1344,7 @@ function gcalConnect() {
     callback: (resp) => {
       if (resp.error) { showToast('Sign-in failed: ' + resp.error); return; }
       gcalSaveToken(resp.access_token, resp.expires_in);
-      gcalUpdateUI();
+      renderGcalSettingsRow();
       showToast('Connected to Google Calendar!');
       gcalSyncAll();
     }
@@ -1367,7 +1357,7 @@ function gcalDisconnect() {
     try { google.accounts.oauth2.revoke(gcalToken, ()=>{}); } catch(e) {}
   }
   gcalClearToken();
-  gcalUpdateUI();
+  renderGcalSettingsRow();
   showToast('Disconnected from Google Calendar');
 }
 
@@ -1436,19 +1426,14 @@ async function gcalDeleteEvent(eventId) {
 }
 
 async function gcalSyncAll() {
-  if (!gcalIsConnected()) return;
-  const dot = document.getElementById('gcalDot');
-  const status = document.getElementById('gcalStatus');
-  if (dot) dot.className = 'gcal-dot syncing';
-  if (status) status.textContent = 'Syncing…';
+  if (!gcalIsConnected()) { showToast('Connect Google Calendar in Settings first'); return; }
   const active = jobs.filter(j => !isArchived(j) && (j.startDate || j.dueDate));
   for (const j of active) { await gcalSyncJob(j); }
-  gcalUpdateUI();
+  renderGcalSettingsRow();
   showToast(`Synced ${active.length} job${active.length !== 1 ? 's' : ''} to Google Calendar`);
 }
 
 // INIT
-gcalUpdateUI();
 showView('list');
 </script>
 <script>
