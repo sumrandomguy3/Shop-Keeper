@@ -904,8 +904,8 @@ function renderEstimate(){
       <div class="cost-line total"><span>Total</span><span>${fmt(e.finalTotal)}</span></div>
       ${e.deposit>0?`<div class="cost-line" style="color:var(--text2)"><span>Deposit received${j.depositDate?' ('+j.depositDate+')':''}</span><span style="color:var(--green)">-${fmt(e.deposit)}</span></div>`:'' }
       ${e.deposit>0?`<div class="cost-line total" style="border-top:2px solid var(--wood)"><span>Balance due</span><span>${fmt(e.balance)}</span></div>`:'' }
-      <div style="margin-top:12px;text-align:right">
-        <button onclick="showRoundModal()" style="background:rgba(245,232,200,0.18);border:1px solid rgba(245,232,200,0.3);border-radius:8px;padding:5px 12px;color:#f5e8c8;font-size:12px;font-weight:600;cursor:pointer">${e.override!=null?'Edit rounding':'Round total'}</button>
+      <div style="padding:12px 14px 14px;text-align:right">
+        <button onclick="showRoundModal()" style="background:var(--bg2);border:1px solid var(--border2);border-radius:8px;padding:7px 14px;color:var(--wood);font-size:12px;font-weight:700;cursor:pointer">${e.override!=null?'Edit rounding':'Round total'}</button>
       </div>
     </div>`;
   document.getElementById('matList').innerHTML=(j.materials||[]).length?
@@ -1021,23 +1021,28 @@ function buildShareText(job, itemized){
       lines.push('  Subtotal         '+fmt(e.miscTotal),'');
     }
     if(e.other>0){ lines.push('OTHER COSTS','───────────────────────────','  Other             '+fmt(e.other),''); }
+    lines.push('───────────────────────────');
+    if(markupPct>0 || taxPct>0) lines.push('Subtotal'.padEnd(20)+fmt(e.sub));
+    if(markupPct>0) lines.push(('Markup ('+markupPct+'%)').padEnd(20)+fmt(e.markup));
+    if(taxPct>0)    lines.push(('Sales tax ('+taxPct+'%)').padEnd(20)+fmt(e.tax));
+    if(e.override!=null){
+      lines.push('Calculated'.padEnd(20)+fmt(e.total));
+      lines.push('Rounding'.padEnd(20)+(e.roundingAdj>=0?'+':'-')+fmt(Math.abs(e.roundingAdj)));
+    }
+    lines.push('TOTAL'.padEnd(20)+fmt(e.finalTotal),'═══════════════════════════');
   } else {
-    lines.push('SUMMARY','───────────────────────────');
-    if(e.matTotal>0)   lines.push('  Materials        '+fmt(e.matTotal));
-    if(e.miscTotal>0)  lines.push('  Misc materials   '+fmt(e.miscTotal));
-    if(e.laborTotal>0) lines.push('  Labor            '+fmt(e.laborTotal));
-    if(e.other>0)      lines.push('  Other            '+fmt(e.other));
-    lines.push('');
+    // Client summary: spread markup + any rounding across materials and labor by their cost share; no hours shown
+    const r2=x=>Math.round(x*100)/100;
+    const matBase=e.matTotal+e.miscTotal+e.other;
+    const base=matBase+e.laborTotal;
+    const nonTax=e.finalTotal-e.tax;
+    const matShown=base>0?r2(nonTax*(matBase/base)):r2(nonTax);
+    const laborShown=r2(nonTax-matShown);
+    if(matShown>0)   lines.push('Materials'.padEnd(20)+fmt(matShown));
+    if(laborShown>0) lines.push('Labor'.padEnd(20)+fmt(laborShown));
+    if(e.tax>0)      lines.push(('Sales tax ('+taxPct+'%)').padEnd(20)+fmt(e.tax));
+    lines.push('───────────────────────────','TOTAL'.padEnd(20)+fmt(e.finalTotal),'═══════════════════════════');
   }
-  lines.push('───────────────────────────');
-  if(markupPct>0 || taxPct>0) lines.push('Subtotal'.padEnd(20)+fmt(e.sub));
-  if(markupPct>0) lines.push(('Markup ('+markupPct+'%)').padEnd(20)+fmt(e.markup));
-  if(taxPct>0)    lines.push(('Sales tax ('+taxPct+'%)').padEnd(20)+fmt(e.tax));
-  if(e.override!=null){
-    lines.push('Calculated'.padEnd(20)+fmt(e.total));
-    lines.push('Rounding'.padEnd(20)+(e.roundingAdj>=0?'+':'-')+fmt(Math.abs(e.roundingAdj)));
-  }
-  lines.push('TOTAL'.padEnd(20)+fmt(e.finalTotal),'═══════════════════════════');
   if(e.deposit>0){
     lines.push('Deposit received    '+fmt(e.deposit));
     if(job.depositDate) lines.push('Deposit date        '+job.depositDate);
