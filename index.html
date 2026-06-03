@@ -878,9 +878,12 @@ function calcEst(job){
   const afterMarkup=sub+markup;
   const tax=afterMarkup*(parseFloat(job.salesTaxPct??settings.salesTaxPct??0)/100);
   const total=afterMarkup+tax;
+  const override=(job.totalOverride!=null && !isNaN(parseFloat(job.totalOverride)))?parseFloat(job.totalOverride):null;
+  const finalTotal=override!=null?override:total;
+  const roundingAdj=override!=null?(override-total):0;
   const deposit=parseFloat(job.depositAmt||0);
-  const balance=Math.max(0,total-deposit);
-  return {matTotal,miscTotal,laborTotal,other,sub,markup,tax,total,rate,deposit,balance};
+  const balance=Math.max(0,finalTotal-deposit);
+  return {matTotal,miscTotal,laborTotal,other,sub,markup,tax,total,override,finalTotal,roundingAdj,rate,deposit,balance};
 }
 function renderEstimate(){
   const j=getJob(); const e=calcEst(j);
@@ -896,9 +899,14 @@ function renderEstimate(){
       ${e.other>0?`<div class="cost-line"><span>Other</span><span>${fmt(e.other)}</span></div>`:''}
       ${parseFloat(j.markupPct??settings.markupPct??0)>0?`<div class="cost-line"><span>Markup (${j.markupPct??settings.markupPct}%)</span><span>${fmt(e.markup)}</span></div>`:''}
       ${parseFloat(j.salesTaxPct??settings.salesTaxPct??0)>0?`<div class="cost-line"><span>Sales tax (${j.salesTaxPct??settings.salesTaxPct}%)</span><span>${fmt(e.tax)}</span></div>`:''}
-      <div class="cost-line total"><span>Total</span><span>${fmt(e.total)}</span></div>
+      ${e.override!=null?`<div class="cost-line"><span>Calculated</span><span>${fmt(e.total)}</span></div>`:''}
+      ${e.override!=null?`<div class="cost-line"><span>Rounding</span><span>${e.roundingAdj>=0?'+':'-'}${fmt(Math.abs(e.roundingAdj))}</span></div>`:''}
+      <div class="cost-line total"><span>Total</span><span>${fmt(e.finalTotal)}</span></div>
       ${e.deposit>0?`<div class="cost-line" style="color:var(--text2)"><span>Deposit received${j.depositDate?' ('+j.depositDate+')':''}</span><span style="color:var(--green)">-${fmt(e.deposit)}</span></div>`:'' }
       ${e.deposit>0?`<div class="cost-line total" style="border-top:2px solid var(--wood)"><span>Balance due</span><span>${fmt(e.balance)}</span></div>`:'' }
+      <div style="margin-top:12px;text-align:right">
+        <button onclick="showRoundModal()" style="background:rgba(245,232,200,0.18);border:1px solid rgba(245,232,200,0.3);border-radius:8px;padding:5px 12px;color:#f5e8c8;font-size:12px;font-weight:600;cursor:pointer">${e.override!=null?'Edit rounding':'Round total'}</button>
+      </div>
     </div>`;
   document.getElementById('matList').innerHTML=(j.materials||[]).length?
     (j.materials||[]).map((m,i)=>`<div class="mat-card">
@@ -953,6 +961,32 @@ function saveMarkup(){ const j=getJob(); j.markupPct=parseFloat(document.getElem
 function saveSalesTax(){ const j=getJob(); j.salesTaxPct=parseFloat(document.getElementById('salesTaxPct').value)||0; save(); renderEstimate(); }
 function saveOther(){ const j=getJob(); j.otherCosts=parseFloat(document.getElementById('otherCosts').value)||0; j.otherNotes=document.getElementById('otherNotes').value; save(); renderEstimate(); }
 function saveDeposit(){ const j=getJob(); j.depositAmt=parseFloat(document.getElementById('depositAmt').value)||0; j.depositDate=document.getElementById('depositDate').value||''; save(); renderEstimate(); }
+function showRoundModal(){
+  const j=getJob(); const e=calcEst(j);
+  const mk=v=>`<div class="chip" onclick="fillRound(${v})">Nearest $${v}</div>`;
+  document.getElementById('modalInner').innerHTML=`
+    <div class="modal-title">Round Total</div>
+    <div style="font-size:13px;font-weight:500;color:var(--text2)">Calculated total</div>
+    <div style="font-size:22px;font-weight:800;color:var(--wood);margin-bottom:14px">${fmt(e.total)}</div>
+    <label>Quick round (to nearest)</label>
+    <div class="chips">${[1,5,10,25,50,100].map(mk).join('')}</div>
+    <label>Final total ($)</label>
+    <div class="prefix"><span>$</span><input id="roundInput" type="number" step="1" placeholder="${e.total.toFixed(0)}" value="${e.override!=null?e.override:''}"/></div>
+    <div style="font-size:12px;color:var(--text3);margin-top:4px">Set the clean number you want to charge. The difference shows as a rounding line on the estimate.</div>
+    <div class="modal-btns">
+      ${e.override!=null?`<button class="btn btn-secondary" onclick="clearRound()">Remove</button>`:''}
+      <button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="applyRound()">Apply</button>
+    </div>`;
+  openModal();
+}
+function fillRound(step){ const e=calcEst(getJob()); document.getElementById('roundInput').value=Math.round(e.total/step)*step; }
+function applyRound(){
+  const v=parseFloat(document.getElementById('roundInput').value);
+  if(isNaN(v)){ alert('Enter a final total or pick a quick-round option.'); return; }
+  const j=getJob(); j.totalOverride=v; save(); closeModal(); renderEstimate();
+}
+function clearRound(){ const j=getJob(); delete j.totalOverride; save(); closeModal(); renderEstimate(); }
 function delMat(i){ const j=getJob(); j.materials.splice(i,1); save(); renderEstimate(); }
 function delMisc(i){ const j=getJob(); j.miscMaterials.splice(i,1); save(); renderEstimate(); }
 function delLabor(i){ const j=getJob(); j.labor.splice(i,1); save(); renderEstimate(); }
@@ -999,7 +1033,11 @@ function buildShareText(job, itemized){
   if(markupPct>0 || taxPct>0) lines.push('Subtotal'.padEnd(20)+fmt(e.sub));
   if(markupPct>0) lines.push(('Markup ('+markupPct+'%)').padEnd(20)+fmt(e.markup));
   if(taxPct>0)    lines.push(('Sales tax ('+taxPct+'%)').padEnd(20)+fmt(e.tax));
-  lines.push('TOTAL'.padEnd(20)+fmt(e.total),'═══════════════════════════');
+  if(e.override!=null){
+    lines.push('Calculated'.padEnd(20)+fmt(e.total));
+    lines.push('Rounding'.padEnd(20)+(e.roundingAdj>=0?'+':'-')+fmt(Math.abs(e.roundingAdj)));
+  }
+  lines.push('TOTAL'.padEnd(20)+fmt(e.finalTotal),'═══════════════════════════');
   if(e.deposit>0){
     lines.push('Deposit received    '+fmt(e.deposit));
     if(job.depositDate) lines.push('Deposit date        '+job.depositDate);
