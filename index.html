@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover" />
   <link rel="manifest" href="manifest.json" />
   <meta name="theme-color" content="#5a3318" />
   <meta name="mobile-web-app-capable" content="yes" />
@@ -13,40 +13,48 @@
 <title>Shop Keeper</title>
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
-html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #e8e2d8; }
+html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #e8e2d8; -webkit-font-smoothing: antialiased; }
 :root {
   --wood: #5a3318; --tan: #b8924a; --tan-light: #ede0c4; --tan-dark: #7a5c2a;
   --green: #1a6b3a; --red: #b02020; --orange: #bf4800; --yellow: #8a6800;
-  --bg: #f5f1eb; --bg2: #ece6d8; --bg3: #e0d8c8; --bg-card: #faf8f4;
-  --border: rgba(90,51,24,0.15); --border2: rgba(90,51,24,0.28);
+  --bg: #f5f1eb; --bg2: #ece6d8; --bg3: #e0d8c8; --bg-card: #fdfbf8;
+  --border: rgba(90,51,24,0.12); --border2: rgba(90,51,24,0.22);
   --text: #1e1208; --text2: #4a3820; --text3: #7a6040;
-  --radius: 10px; --radius-lg: 14px;
+  --radius: 12px; --radius-lg: 16px;
+  --shadow-sm: 0 1px 2px rgba(60,34,12,0.06);
+  --shadow: 0 1px 3px rgba(60,34,12,0.07), 0 2px 8px rgba(60,34,12,0.05);
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { transition: none !important; animation: none !important; }
 }
 .app { max-width: 430px; margin: 0 auto; min-height: 100vh; background: var(--bg); display: flex; flex-direction: column; }
 
 /* HEADER */
-.header { background: var(--wood); color: #f5e8c8; padding: 16px 20px 14px; display: flex; align-items: center; gap: 10px; }
+.header { background: linear-gradient(180deg, #66401f 0%, var(--wood) 100%); color: #f5e8c8; padding: calc(16px + env(safe-area-inset-top)) 20px 14px; display: flex; align-items: center; gap: 10px; }
 .header-back { background: none; border: none; color: #f5e8c8; font-size: 22px; cursor: pointer; padding: 0 4px; display: none; line-height: 1; }
 .header-title { font-size: 20px; font-weight: 700; color: #f5e8c8; flex: 1; letter-spacing: -0.3px; }
 .header-sub { font-size: 12px; color: rgba(245,232,200,0.7); margin-top: 2px; }
-.header-action { background: rgba(245,232,200,0.18); border: 1px solid rgba(245,232,200,0.3); border-radius: 8px; padding: 7px 14px; color: #f5e8c8; font-size: 14px; font-weight: 600; cursor: pointer; white-space: nowrap; }
+.header-action { background: rgba(245,232,200,0.16); border: 1px solid rgba(245,232,200,0.28); border-radius: 10px; padding: 7px 14px; color: #f5e8c8; font-size: 14px; font-weight: 600; cursor: pointer; white-space: nowrap; transition: background 0.12s ease; }
+.header-action:active { background: rgba(245,232,200,0.3); }
 
 /* BOTTOM NAV */
-#bottomNav { display: flex; border-top: 1px solid var(--border2); background: var(--bg-card); flex-shrink: 0; }
-.bnav-item { flex: 1; padding: 12px 0 10px; text-align: center; font-size: 11px; font-weight: 600; color: var(--text3); cursor: pointer; border-top: 2.5px solid transparent; margin-top: -1px; display: flex; flex-direction: column; align-items: center; gap: 3px; }
-.bnav-item .bnav-icon { font-size: 20px; line-height: 1; }
-.bnav-item.active { color: var(--wood); border-top-color: var(--wood); }
+#bottomNav { display: flex; border-top: 1px solid var(--border); background: var(--bg-card); flex-shrink: 0; padding: 6px 8px calc(6px + env(safe-area-inset-bottom)); gap: 4px; }
+.bnav-item { flex: 1; padding: 8px 0 7px; text-align: center; font-size: 11px; font-weight: 600; color: var(--text3); cursor: pointer; border-radius: 12px; display: flex; flex-direction: column; align-items: center; gap: 3px; transition: background 0.15s ease, color 0.15s ease; }
+.bnav-item .bnav-icon { line-height: 1; display: flex; align-items: center; justify-content: center; height: 24px; }
+.bnav-item .bnav-icon svg { width: 22px; height: 22px; }
+.bnav-item.active { color: var(--wood); background: var(--tan-light); font-weight: 700; }
 
 /* DETAIL TABS */
-.tab-bar { display: flex; border-bottom: 1px solid var(--border2); background: var(--bg-card); overflow-x: auto; padding: 0 8px; flex-shrink: 0; }
-.tab { flex-shrink: 0; padding: 12px 14px; font-size: 13px; font-weight: 500; color: var(--text3); cursor: pointer; border-bottom: 2.5px solid transparent; margin-bottom: -1px; white-space: nowrap; }
+.tab-bar { display: flex; border-bottom: 1px solid var(--border); background: var(--bg-card); overflow-x: auto; padding: 0 8px; flex-shrink: 0; }
+.tab { flex-shrink: 0; padding: 12px 14px; font-size: 13px; font-weight: 600; color: var(--text3); cursor: pointer; border-bottom: 2.5px solid transparent; margin-bottom: -1px; white-space: nowrap; transition: color 0.12s ease; }
 .tab.active { color: var(--wood); border-bottom-color: var(--wood); font-weight: 700; }
 .tab-content { display: none; padding: 16px; }
 .tab-content.active { display: block; }
 
 /* BUTTONS */
-.btn { border-radius: var(--radius); padding: 11px 18px; font-size: 15px; font-weight: 600; cursor: pointer; border: none; }
-.btn-primary { background: var(--wood); color: #f5e8c8; width: 100%; padding: 14px; }
+.btn { border-radius: var(--radius); padding: 11px 18px; font-size: 15px; font-weight: 600; cursor: pointer; border: none; transition: transform 0.12s ease, filter 0.12s ease; }
+.btn:active { transform: scale(0.98); filter: brightness(0.96); }
+.btn-primary { background: var(--wood); color: #f5e8c8; width: 100%; padding: 14px; box-shadow: var(--shadow-sm); }
 .btn-secondary { background: var(--bg2); color: var(--text); border: 1px solid var(--border2); font-size: 14px; }
 .btn-green { background: var(--green); color: #fff; }
 .btn-icon { background: none; border: none; color: var(--text3); font-size: 18px; cursor: pointer; padding: 4px 6px; line-height: 1; }
@@ -55,6 +63,8 @@ html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Sego
 input, select, textarea { width: 100%; border: 1px solid var(--border2); border-radius: var(--radius); padding: 11px 13px; font-size: 15px; color: var(--text); background: var(--bg-card); margin-bottom: 12px; font-family: inherit; }
 input:focus, select:focus, textarea:focus { outline: 2px solid var(--tan); outline-offset: -1px; border-color: var(--tan); }
 label { font-size: 13px; font-weight: 600; color: var(--text2); display: block; margin-bottom: 5px; }
+input[type="checkbox"] { width: 19px; height: 19px; margin: 0; accent-color: var(--wood); flex-shrink: 0; }
+.followup-toggle { display: flex; align-items: center; gap: 10px; padding: 12px 14px; background: var(--bg2); border: 1px solid var(--border); border-radius: var(--radius); margin-bottom: 12px; cursor: pointer; font-size: 14px; font-weight: 600; color: var(--text); }
 .row2 { display: flex; gap: 10px; }
 .row2 > div { flex: 1; }
 .prefix { position: relative; }
@@ -78,7 +88,8 @@ label { font-size: 13px; font-weight: 600; color: var(--text2); display: block; 
 .status-select-wrap.s-complete::after { color: #2a2a2a; }
 
 /* JOB CARDS */
-.job-card { background: var(--bg-card); border: 1px solid var(--border2); border-radius: var(--radius-lg); padding: 15px 16px; margin-bottom: 12px; cursor: pointer; border-left: 5px solid var(--tan); }
+.job-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 15px 16px; margin-bottom: 12px; cursor: pointer; border-left: 5px solid var(--tan); box-shadow: var(--shadow); transition: transform 0.12s ease; }
+.job-card:active { transform: scale(0.985); }
 .job-card.urgent  { border-left-color: var(--red);    background: #fdf5f5; }
 .job-card.warning { border-left-color: var(--orange);  background: #fdf7f2; }
 .job-card.soon    { border-left-color: var(--yellow);  background: #fdf9ea; }
@@ -99,8 +110,25 @@ label { font-size: 13px; font-weight: 600; color: var(--text2); display: block; 
 .prog-bar  { margin-top: 10px; height: 6px; background: var(--bg3); border-radius: 3px; overflow: hidden; }
 .prog-fill { height: 100%; border-radius: 3px; }
 
+/* CONTACT CHIPS */
+.contact-chips { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 7px; }
+.contact-chip { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 600; padding: 5px 11px; border-radius: 20px; background: var(--bg2); color: var(--text2); border: 1px solid var(--border); text-decoration: none; max-width: 100%; cursor: pointer; transition: background 0.12s ease; }
+.contact-chip:active { background: var(--tan-light); color: var(--tan-dark); }
+.contact-chip svg { width: 13px; height: 13px; flex-shrink: 0; }
+.contact-chip .cc-val { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 180px; }
+.tmp-contact-row { display: flex; align-items: center; gap: 8px; padding: 9px 12px; background: var(--bg2); border: 1px solid var(--border); border-radius: var(--radius); margin-bottom: 8px; font-size: 14px; }
+.tmp-contact-row .tcr-method { font-weight: 700; color: var(--text2); font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; flex-shrink: 0; }
+.tmp-contact-row .tcr-val { flex: 1; font-weight: 500; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* FINISH RECIPE */
+.finish-step { display: flex; align-items: flex-start; gap: 12px; padding: 13px 0; border-bottom: 1px solid var(--border); }
+.finish-step:last-child { border-bottom: none; }
+.step-num { width: 26px; height: 26px; border-radius: 50%; background: var(--tan-light); color: var(--tan-dark); font-size: 13px; font-weight: 800; display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin-top: 1px; }
+.finish-step .fs-product { font-size: 15px; font-weight: 700; color: var(--text); line-height: 1.25; }
+.finish-step .fs-meta { font-size: 13px; font-weight: 500; color: var(--text2); margin-top: 3px; line-height: 1.45; white-space: pre-wrap; }
+
 /* ARCHIVE BANNER */
-.archive-banner { background: var(--bg2); border: 1px solid var(--border2); border-radius: var(--radius); padding: 12px 16px; margin-bottom: 16px; display: flex; align-items: center; gap: 10px; }
+.archive-banner { background: var(--bg2); border: 1px solid var(--border); border-radius: var(--radius); padding: 12px 16px; margin-bottom: 16px; display: flex; align-items: center; gap: 10px; }
 .archive-banner-icon { font-size: 22px; }
 .archive-banner-text { font-size: 13px; font-weight: 500; color: var(--text2); }
 .archive-banner-text strong { color: var(--text); font-weight: 700; }
@@ -117,22 +145,23 @@ label { font-size: 13px; font-weight: 600; color: var(--text2); display: block; 
 .bf-unit { font-size: 14px; font-weight: 600; color: var(--tan-dark); margin-top: 2px; }
 
 /* PHOTOS */
-.photo-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
-.photo-thumb { border-radius: var(--radius); overflow: hidden; position: relative; background: var(--bg2); cursor: pointer; align-self: start; }
-.photo-thumb .photo-img-wrap { aspect-ratio: 1; overflow: hidden; }
-.photo-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; transition: opacity 0.15s; }
-.photo-thumb:active img { opacity: 0.8; }
-.photo-note-bar { padding: 0 8px; background: var(--bg2); font-size: 11px; font-weight: 500; color: var(--text2); border-top: 1px solid var(--border); height: 30px; line-height: 30px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.photo-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.photo-thumb { border-radius: 12px; overflow: hidden; position: relative; background: var(--bg2); cursor: pointer; border: 1px solid var(--border); box-shadow: var(--shadow-sm); transition: transform 0.12s ease; }
+.photo-thumb:active { transform: scale(0.97); }
+/* Square tile: padding-top reserves the box, img is pinned to it — identical render on every browser */
+.photo-thumb .photo-img-wrap { position: relative; width: 100%; padding-top: 100%; overflow: hidden; background: var(--bg3); }
+.photo-thumb img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; display: block; }
+.photo-note-bar { padding: 0 9px; background: var(--bg-card); font-size: 11px; font-weight: 500; color: var(--text2); border-top: 1px solid var(--border); height: 32px; line-height: 32px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .photo-note-bar.empty { color: var(--text3); font-style: italic; }
-.photo-del { position: absolute; top: 4px; right: 4px; background: rgba(0,0,0,0.65); color: #fff; border: none; border-radius: 50%; width: 24px; height: 24px; font-size: 13px; cursor: pointer; display: flex; align-items: center; justify-content: center; z-index: 2; }
-.photo-action-bar { display: flex; gap: 10px; padding: 12px 16px; border-top: 1px solid var(--border2); background: var(--bg-card); flex-shrink: 0; }
-.photo-action-bar button { flex: 1; display: flex; align-items: center; justify-content: center; gap: 8px; padding: 13px; border-radius: var(--radius); border: 1px solid var(--border2); background: var(--bg2); color: var(--text2); font-size: 14px; font-weight: 600; cursor: pointer; }
-.photo-action-bar button:active { background: var(--tan-light); color: var(--tan-dark); }
+.photo-del { position: absolute; top: 6px; right: 6px; background: rgba(20,12,4,0.55); -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); color: #fff; border: none; border-radius: 50%; width: 26px; height: 26px; font-size: 12px; cursor: pointer; display: flex; align-items: center; justify-content: center; z-index: 2; }
+.photo-action-bar { display: flex; gap: 10px; padding: 12px 16px calc(12px + env(safe-area-inset-bottom)); border-top: 1px solid var(--border); background: var(--bg-card); flex-shrink: 0; }
+.photo-action-bar button { flex: 1; display: flex; align-items: center; justify-content: center; gap: 8px; padding: 13px; border-radius: var(--radius); border: 1px solid var(--border2); background: var(--bg2); color: var(--text2); font-size: 14px; font-weight: 600; cursor: pointer; transition: background 0.12s ease, transform 0.12s ease; }
+.photo-action-bar button:active { background: var(--tan-light); color: var(--tan-dark); transform: scale(0.98); }
 /* LIGHTBOX */
 .lightbox { position: fixed; inset: 0; background: rgba(0,0,0,0.96); z-index: 500; display: flex; flex-direction: column; max-width: 430px; margin: 0 auto; }
 .lightbox-img-area { flex: 1; display: flex; align-items: center; justify-content: center; padding: 16px; overflow: hidden; }
 .lightbox-img-area img { max-width: 100%; max-height: 100%; object-fit: contain; border-radius: 6px; }
-.lightbox-bar { background: rgba(0,0,0,0.85); padding: 12px 16px 20px; border-top: 1px solid rgba(255,255,255,0.1); }
+.lightbox-bar { background: rgba(0,0,0,0.85); padding: 12px 16px calc(20px + env(safe-area-inset-bottom)); border-top: 1px solid rgba(255,255,255,0.1); }
 .lightbox-note { width: 100%; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.25); border-radius: var(--radius); padding: 10px 12px; font-size: 14px; color: #f5e8c8; font-family: inherit; resize: none; margin-bottom: 10px; }
 .lightbox-note::placeholder { color: rgba(245,232,200,0.4); }
 .lightbox-note:focus { outline: none; border-color: var(--tan); }
@@ -145,13 +174,13 @@ label { font-size: 13px; font-weight: 600; color: var(--text2); display: block; 
 
 /* ESTIMATE */
 .est-header { background: var(--wood); color: #f5e8c8; padding: 14px 16px; font-size: 14px; font-weight: 700; display: flex; justify-content: space-between; align-items: center; border-radius: var(--radius-lg) var(--radius-lg) 0 0; }
-.est-body { border: 1px solid var(--border2); border-top: none; border-radius: 0 0 var(--radius-lg) var(--radius-lg); margin-bottom: 20px; overflow: hidden; background: var(--bg-card); }
+.est-body { border: 1px solid var(--border); border-top: none; border-radius: 0 0 var(--radius-lg) var(--radius-lg); margin-bottom: 20px; overflow: hidden; background: var(--bg-card); box-shadow: var(--shadow-sm); }
 .cost-line { display: flex; justify-content: space-between; padding: 12px 16px; border-bottom: 1px solid var(--border); font-size: 15px; }
 .cost-line:last-child { border-bottom: none; }
 .cost-line.total { font-weight: 700; font-size: 16px; background: var(--bg2); }
 .cost-line.total span:last-child { color: var(--wood); }
 .cost-line span:first-child { color: var(--text2); font-weight: 500; }
-.mat-card { background: var(--bg-card); border: 1px solid var(--border2); border-radius: var(--radius); padding: 12px 14px; margin-bottom: 10px; }
+.mat-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); padding: 12px 14px; margin-bottom: 10px; box-shadow: var(--shadow-sm); }
 .labor-row { display: flex; align-items: center; gap: 10px; padding: 11px 0; border-bottom: 1px solid var(--border); }
 .labor-row:last-child { border-bottom: none; }
 
@@ -167,14 +196,16 @@ label { font-size: 13px; font-weight: 600; color: var(--text2); display: block; 
 .cal-day.today { font-weight: 800; color: var(--wood); background: var(--tan-light); }
 .cal-day .dots { display: flex; gap: 2px; position: absolute; bottom: 3px; }
 .cal-day .dot { width: 5px; height: 5px; border-radius: 50%; }
-.cal-job-item { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-radius: var(--radius); border: 1px solid var(--border2); margin-bottom: 10px; cursor: pointer; background: var(--bg-card); }
+.cal-job-item { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-radius: var(--radius); border: 1px solid var(--border); margin-bottom: 10px; cursor: pointer; background: var(--bg-card); box-shadow: var(--shadow-sm); }
 .cal-job-item .bar { width: 5px; border-radius: 3px; align-self: stretch; flex-shrink: 0; min-height: 38px; }
 .cal-job-item .cj-name  { font-size: 15px; font-weight: 700; color: var(--text); }
 .cal-job-item .cj-dates { font-size: 13px; font-weight: 500; color: var(--text2); margin-top: 2px; }
 
 /* MODAL */
 .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.55); display: flex; align-items: flex-end; z-index: 200; max-width: 430px; margin: 0 auto; }
-.modal { background: var(--bg); border-radius: 20px 20px 0 0; padding: 24px 20px 36px; width: 100%; max-height: 88vh; overflow-y: auto; }
+.modal { background: var(--bg); border-radius: 24px 24px 0 0; padding: 14px 20px calc(32px + env(safe-area-inset-bottom)); width: 100%; max-height: 88vh; overflow-y: auto; animation: sheetUp 0.22s ease; }
+.modal::before { content: ''; display: block; width: 38px; height: 4px; border-radius: 2px; background: var(--border2); margin: 0 auto 16px; }
+@keyframes sheetUp { from { transform: translateY(24px); opacity: 0.6; } to { transform: translateY(0); opacity: 1; } }
 .modal-title { font-size: 20px; font-weight: 800; margin-bottom: 20px; color: var(--text); }
 .modal-btns { display: flex; gap: 10px; margin-top: 8px; }
 .modal-btns .btn-secondary { flex: 1; }
@@ -217,6 +248,7 @@ label { font-size: 13px; font-weight: 600; color: var(--text2); display: block; 
   <!-- ACTIVE JOBS -->
   <div id="viewList" style="flex:1;overflow-y:auto;display:flex;flex-direction:column">
     <div style="padding:16px;flex:1">
+      <div id="followUps"></div>
       <div class="slabel" style="margin-top:8px">Active Jobs</div>
       <div id="jobList"></div>
     </div>
@@ -254,6 +286,7 @@ label { font-size: 13px; font-weight: 600; color: var(--text2); display: block; 
       <div class="tab active" onclick="sw('cutlist')">Cut List</div>
       <div class="tab" onclick="sw('boardfoot')">Board Feet</div>
       <div class="tab" onclick="sw('photos')">Photos</div>
+      <div class="tab" onclick="sw('finish')">Finish</div>
       <div class="tab" onclick="sw('estimate')">Estimate</div>
     </div>
     <div style="flex:1;overflow-y:auto">
@@ -285,6 +318,15 @@ label { font-size: 13px; font-weight: 600; color: var(--text2); display: block; 
         <div class="photo-grid" id="photoGrid"></div>
         <input type="file" id="photoInputCamera" accept="image/*" capture="environment" style="display:none" onchange="handlePhoto(event)"/>
         <input type="file" id="photoInputRoll" accept="image/*" multiple style="display:none" onchange="handlePhoto(event)"/>
+      </div>
+      <div id="tab-finish" class="tab-content">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+          <div class="slabel" style="margin:0">Finish schedule</div>
+          <button class="btn btn-secondary" onclick="showAddFinishModal()" style="padding:8px 14px;font-size:13px">+ Add Step</button>
+        </div>
+        <div id="finishList"></div>
+        <div class="slabel">Finish notes</div>
+        <textarea id="finishNotes" rows="3" placeholder="Wood prep, conditioner, room temp, anything you'd need to match this finish later..." onchange="saveFinishNotes()"></textarea>
       </div>
       <div id="tab-estimate" class="tab-content">
         <div id="estSummary"></div>
@@ -338,13 +380,13 @@ label { font-size: 13px; font-weight: 600; color: var(--text2); display: block; 
   <!-- BOTTOM NAV -->
   <div id="bottomNav">
     <div class="bnav-item active" onclick="showView('list')" id="nav-list">
-      <span class="bnav-icon">&#127968;</span>Jobs
+      <span class="bnav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l9-8 9 8"/><path d="M5 9.5V21h14V9.5"/><path d="M9 21v-6h6v6"/></svg></span>Jobs
     </div>
     <div class="bnav-item" onclick="showView('archive')" id="nav-archive">
-      <span class="bnav-icon">&#128230;</span>Archive
+      <span class="bnav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="5" rx="1"/><path d="M5 9v10a1 1 0 001 1h12a1 1 0 001-1V9"/><path d="M10 13h4"/></svg></span>Archive
     </div>
     <div class="bnav-item" onclick="showView('cal')" id="nav-cal">
-      <span class="bnav-icon">&#128197;</span>Calendar
+      <span class="bnav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18"/></svg></span>Calendar
     </div>
   </div>
 </div>
@@ -499,6 +541,47 @@ function showToast(msg){
   t._timer=setTimeout(()=>{ t.style.opacity='0'; },2000);
 }
 
+// Strip URLs / @ so "instagram.com/handle" and "@handle" both work
+function cleanHandle(v){
+  return v.trim()
+    .replace(/^https?:\/\//i,'')
+    .replace(/^(www\.)?(m\.me|facebook\.com|fb\.com|instagram\.com|ig\.me\/m)\//i,'')
+    .replace(/^@/,'')
+    .replace(/\/+$/,'')
+    .split('?')[0];
+}
+function contactHref(c){
+  const v=c.value.trim();
+  if(c.method==='phone') return 'tel:'+v.replace(/[^\d+]/g,'');
+  if(c.method==='text')  return 'sms:'+v.replace(/[^\d+]/g,'');
+  if(c.method==='email') return 'mailto:'+v;
+  if(c.method==='facebook')  return 'https://m.me/'+encodeURIComponent(cleanHandle(v));
+  if(c.method==='instagram') return 'https://ig.me/m/'+encodeURIComponent(cleanHandle(v));
+  return null;
+}
+const CONTACT_ICONS={
+  phone:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07 19.5 19.5 0 01-6-6 19.79 19.79 0 01-3.07-8.67A2 2 0 014.11 2h3a2 2 0 012 1.72c.13.96.36 1.9.7 2.81a2 2 0 01-.45 2.11L8.09 9.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45c.91.34 1.85.57 2.81.7A2 2 0 0122 16.92z"/></svg>',
+  text:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 01-.9 3.8 8.5 8.5 0 01-7.6 4.7 8.38 8.38 0 01-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 01-.9-3.8 8.5 8.5 0 014.7-7.6 8.38 8.38 0 013.8-.9h.5a8.48 8.48 0 018 8v.5z"/></svg>',
+  email:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M22 7l-10 6L2 7"/></svg>',
+  facebook:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a10 10 0 00-7.4 16.7L4 22l3.5-.9A10 10 0 1012 2z"/><path d="M7.5 12.5l3-3 2.5 2.5 3.5-3.5"/></svg>',
+  instagram:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="20" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="0.5" fill="currentColor"/></svg>',
+  other:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.1 9a3 3 0 015.8 1c0 2-3 3-3 3"/><circle cx="12" cy="17" r="0.5" fill="currentColor"/></svg>'
+};
+function contactChipsHtml(j){
+  const cs=j.contacts||[];
+  if(!cs.length) return '';
+  return `<div class="contact-chips">`+cs.map((c,i)=>{
+    const icon=CONTACT_ICONS[c.method]||CONTACT_ICONS.other;
+    const href=contactHref(c);
+    const disp=(c.method==='facebook'||c.method==='instagram')?'@'+cleanHandle(c.value):c.value;
+    if(href) return `<a class="contact-chip" href="${href}" target="_blank" rel="noopener" onclick="event.stopPropagation()">${icon}<span class="cc-val">${esc(disp)}</span></a>`;
+    return `<span class="contact-chip" onclick="event.stopPropagation();copyContact('${esc(c.value).replace(/'/g,"\\'")}')">${icon}<span class="cc-val">${esc(disp)}</span></span>`;
+  }).join('')+`</div>`;
+}
+function copyContact(v){
+  if(navigator.clipboard){ navigator.clipboard.writeText(v).then(()=>showToast('Copied')); }
+}
+
 function statusSelectHtml(job){
   const si=sInfo(job.status||'inquiry');
   const opts=STATUS_OPTS.map(s=>`<option value="${s.val}"${s.val===si.val?' selected':''}>${s.label}</option>`).join('');
@@ -519,6 +602,7 @@ function jobCardHtml(j, archived){
       <div style="flex:1">
         <div class="job-title">${j.name}</div>
         ${j.client?`<div class="job-client">${j.client}</div>`:''}
+        ${contactChipsHtml(j)}
       </div>
       <div style="display:flex;align-items:center;gap:2px;flex-shrink:0;margin-top:-2px">
         <button class="btn-icon" onclick="event.stopPropagation();event.preventDefault();showEditJobModal('${j.id}')" style="color:var(--text3);font-size:16px;padding:4px 6px" title="Edit job">&#9998;</button>
@@ -536,6 +620,7 @@ function jobCardHtml(j, archived){
       ${bf>0?`<span class="pill ${archived?'pill-gray':'pill-tan'}">${bf.toFixed(1)} bf</span>`:''}
       ${photos?`<span class="pill ${archived?'pill-gray':'pill-tan'}">${photos} photo${photos>1?'s':''}</span>`:''}
       ${est.total>0?`<span class="pill ${archived?'pill-gray':'pill-green'}">${fmt(est.total)}</span>`:''}
+      ${j.followUpDate&&!j.followUpDone?`<span class="pill" style="background:#fae3cf;color:#7a3d00">Follow up ${fmtDateShort(j.followUpDate)}</span>`:''}
     </div>
   </div>`;
 }
@@ -576,20 +661,51 @@ function goBack(){
   showView(prevView||'list');
 }
 function sw(tab){
-  ['cutlist','boardfoot','photos','estimate'].forEach(t=>document.getElementById('tab-'+t).classList.toggle('active',t===tab));
-  document.querySelectorAll('#viewDetail .tab').forEach((el,i)=>el.classList.toggle('active',['cutlist','boardfoot','photos','estimate'][i]===tab));
+  const TABS=['cutlist','boardfoot','photos','finish','estimate'];
+  TABS.forEach(t=>document.getElementById('tab-'+t).classList.toggle('active',t===tab));
+  document.querySelectorAll('#viewDetail .tab').forEach((el,i)=>el.classList.toggle('active',TABS[i]===tab));
   document.getElementById('photoActionBar').style.display = tab==='photos' ? 'flex' : 'none';
   if(tab==='cutlist') renderCutList();
   if(tab==='boardfoot') renderBFLog();
   if(tab==='photos') renderPhotos();
+  if(tab==='finish') renderFinish();
   if(tab==='estimate') renderEstimate();
 }
 
 function renderJobList(){
+  renderFollowUps();
   const el=document.getElementById('jobList');
   const active=jobs.filter(j=>!isArchived(j));
   if(!active.length){ el.innerHTML=`<div class="empty"><div class="empty-icon">&#128296;</div>No active jobs.<br>Tap + Job to get started.</div>`; return; }
   el.innerHTML=active.map(j=>jobCardHtml(j,false)).join('');
+}
+function renderFollowUps(){
+  const el=document.getElementById('followUps'); if(!el) return;
+  const t=new Date().toISOString().split('T')[0];
+  const due=jobs.filter(j=>j.followUpDate && !j.followUpDone && j.followUpDate<=t);
+  if(!due.length){ el.innerHTML=''; return; }
+  el.innerHTML=`<div class="slabel" style="margin-top:8px;color:var(--orange)">Follow-ups due</div>`+
+    due.map(j=>`<div class="job-card" style="border-left-color:var(--orange);background:#fdf7f2" onclick="openJob('${j.id}')">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
+        <div style="flex:1;min-width:0">
+          <div class="job-title">${j.client||j.name}</div>
+          <div class="job-client">${j.client?esc(j.name)+' — ':''}completed ${fmtDateShort(j.completedDate)}</div>
+          ${contactChipsHtml(j)}
+        </div>
+        <button class="btn btn-secondary" style="flex-shrink:0;padding:8px 14px;font-size:13px" onclick="event.stopPropagation();markFollowUpDone('${j.id}')">Done</button>
+      </div>
+    </div>`).join('');
+}
+function fmtDateShort(d){
+  if(!d) return '';
+  const dt=new Date(d+'T12:00:00');
+  return dt.toLocaleDateString(undefined,{month:'short',day:'numeric',year:'numeric'});
+}
+function markFollowUpDone(id){
+  const j=jobs.find(x=>x.id===id); if(!j) return;
+  j.followUpDone=true;
+  if(j.followUpGcalId){ gcalDeleteEvent(j.followUpGcalId); j.followUpGcalId=null; }
+  save(); renderFollowUps(); showToast('Follow-up done');
 }
 function renderArchiveList(){
   const el=document.getElementById('archiveList');
@@ -609,6 +725,52 @@ function applyStatusSideEffects(j, wasArchived){
   } else if(!wasArchived && !nowArchived){
     gcalSyncJob(j);
   }
+  reconcileFollowUp(j);
+}
+// Schedule or clear the follow-up reminder based on status + the per-job toggle
+function reconcileFollowUp(j){
+  const wants = j.status==='complete' && j.followUp && j.followUp.enabled && !j.followUpDone;
+  if(wants){
+    if(!j.completedDate) j.completedDate=new Date().toISOString().split('T')[0];
+    const d=new Date(j.completedDate+'T12:00:00');
+    d.setMonth(d.getMonth()+(j.followUp.months||6));
+    const newDate=d.toISOString().split('T')[0];
+    if(j.followUpDate!==newDate){ j.followUpDate=newDate; }
+    gcalSyncFollowUp(j);
+  } else {
+    if(j.status!=='complete') j.completedDate=null;
+    if(j.followUpGcalId){ gcalDeleteEvent(j.followUpGcalId); j.followUpGcalId=null; }
+    if(!j.followUpDone) j.followUpDate=null;
+  }
+  save();
+}
+async function gcalSyncFollowUp(j){
+  if(!gcalIsConnected() || !j.followUpDate) return;
+  const contactLines=(j.contacts||[]).map(c=>{
+    const m=CONTACT_METHODS.find(x=>x.val===c.method);
+    return (m?m.label:'Contact')+': '+c.value;
+  }).join('\n');
+  const event={
+    summary:`[SK] Follow up: ${j.client||j.name}`,
+    description:[`Job: ${j.name}`, contactLines, '\nCheck in — how is the piece settling in? Managed by Shop Keeper'].filter(Boolean).join('\n'),
+    start:{date:j.followUpDate}, end:{date:j.followUpDate},
+    colorId:'5',
+    extendedProperties:{private:{shopKeeperFollowUp:j.id}}
+  };
+  try{
+    if(j.followUpGcalId){
+      const r=await fetch(`https://www.googleapis.com/calendar/v3/calendars/${GCAL_CALENDAR_ID}/events/${j.followUpGcalId}`,
+        {method:'PUT',headers:{Authorization:`Bearer ${gcalToken}`,'Content-Type':'application/json'},body:JSON.stringify(event)});
+      if(r.status===404){ j.followUpGcalId=null; await gcalSyncFollowUp(j); return; }
+      if(!r.ok) throw new Error(await r.text());
+    } else {
+      const r=await fetch(`https://www.googleapis.com/calendar/v3/calendars/${GCAL_CALENDAR_ID}/events`,
+        {method:'POST',headers:{Authorization:`Bearer ${gcalToken}`,'Content-Type':'application/json'},body:JSON.stringify(event)});
+      if(!r.ok) throw new Error(await r.text());
+      j.followUpGcalId=(await r.json()).id;
+    }
+    save();
+  }catch(e){ console.warn('GCal follow-up sync error:', e); }
 }
 function deleteJob(id){
   const j=jobs.find(jb=>jb.id===id); if(!j) return;
@@ -625,6 +787,7 @@ function deleteJob(id){
 function confirmDeleteJob(id){
   const j=jobs.find(jb=>jb.id===id);
   if(j && j.gcalEventId) gcalDeleteEvent(j.gcalEventId);
+  if(j && j.followUpGcalId) gcalDeleteEvent(j.followUpGcalId);
   jobs=jobs.filter(j=>j.id!==id); save(); closeModal(); renderLists();
 }
 
@@ -737,6 +900,79 @@ function renderBFLog(){
 function deleteBF(i){ const j=getJob(); j.bfLog.splice(i,1); save(); renderBFLog(); }
 
 // PHOTOS
+function renderFinish(){
+  const j=getJob(); const steps=j.finishSteps||[];
+  const el=document.getElementById('finishList');
+  el.innerHTML=steps.length?steps.map((st,i)=>{
+    const meta=[st.coats?`${st.coats} coat${st.coats>1?'s':''}`:'', st.details||''].filter(Boolean).join(' — ');
+    return `<div class="finish-step">
+      <div class="step-num">${i+1}</div>
+      <div style="flex:1;min-width:0">
+        <div class="fs-product">${esc(st.product)}</div>
+        ${meta?`<div class="fs-meta">${esc(meta)}</div>`:''}
+      </div>
+      <button class="btn-icon" onclick="showEditFinishModal(${i})" title="Edit">&#9998;</button>
+      <button class="btn-icon" onclick="delFinishStep(${i})" style="color:var(--red)">&#10005;</button>
+    </div>`;
+  }).join('')
+  :`<div style="color:var(--text3);font-size:14px;font-weight:500;margin-bottom:12px;line-height:1.5">No finish recipe yet. Record each product, coats, and prep — so you can match this finish on a repair or companion piece years from now.</div>`;
+  document.getElementById('finishNotes').value=j.finishNotes||'';
+}
+function finishModalFields(st){
+  st=st||{};
+  return `<label>Product *</label><input id="fProduct" type="text" placeholder="e.g. Arm-R-Seal Satin, Danish Oil..." value="${esc(st.product||'')}"/>
+    <label>Coats</label><input id="fCoats" type="number" min="1" placeholder="3" value="${st.coats||''}"/>
+    <label>Details</label><textarea id="fDetails" rows="3" placeholder="Dilution, applicator, grit between coats, dry time...">${(st.details||'').replace(/</g,'&lt;')}</textarea>`;
+}
+function showAddFinishModal(){
+  document.getElementById('modalInner').innerHTML=`
+    <div class="modal-title">Add Finish Step</div>
+    ${finishModalFields()}
+    <div class="modal-btns">
+      <button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="addFinishStep()">Add Step</button>
+    </div>`;
+  openModal();
+}
+function readFinishModal(){
+  const product=document.getElementById('fProduct').value.trim();
+  if(!product){ alert('Enter a product name.'); return null; }
+  return { product, coats:parseInt(document.getElementById('fCoats').value)||0, details:document.getElementById('fDetails').value.trim() };
+}
+function addFinishStep(){
+  const st=readFinishModal(); if(!st) return;
+  const j=getJob();
+  if(!j.finishSteps) j.finishSteps=[];
+  j.finishSteps.push(st);
+  save(); closeModal(); renderFinish();
+}
+function showEditFinishModal(i){
+  const j=getJob(); const st=(j.finishSteps||[])[i]; if(!st) return;
+  document.getElementById('modalInner').innerHTML=`
+    <div class="modal-title">Edit Finish Step</div>
+    ${finishModalFields(st)}
+    <div class="modal-btns">
+      <button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="saveFinishStep(${i})">Save Changes</button>
+    </div>`;
+  openModal();
+}
+function saveFinishStep(i){
+  const st=readFinishModal(); if(!st) return;
+  const j=getJob();
+  j.finishSteps[i]=st;
+  save(); closeModal(); renderFinish();
+}
+function delFinishStep(i){
+  const j=getJob();
+  j.finishSteps.splice(i,1);
+  save(); renderFinish();
+}
+function saveFinishNotes(){
+  const j=getJob();
+  j.finishNotes=document.getElementById('finishNotes').value;
+  save();
+}
 function renderPhotos(){
   const j=getJob(); const photos=getJobPhotos(j.id);
   const grid=document.getElementById('photoGrid');
@@ -1087,11 +1323,74 @@ function openModal(){ document.getElementById('modalWrap').style.display='block'
 function closeModal(){ document.getElementById('modalWrap').style.display='none'; }
 function closeModalOuter(e){ if(e.target===document.getElementById('modalWrap')) closeModal(); }
 
+const CONTACT_METHODS=[
+  {val:'phone',    label:'Phone'},
+  {val:'text',     label:'Text'},
+  {val:'email',    label:'Email'},
+  {val:'facebook', label:'Messenger'},
+  {val:'instagram',label:'Instagram'},
+  {val:'other',    label:'Other'}
+];
+let _tmpContacts=[];
+function contactsFieldHtml(){
+  return `<label>Contact</label>
+    <div id="tmpContacts"></div>
+    <div style="display:flex;gap:8px">
+      <select id="cMethod" style="flex:0 0 130px;margin-bottom:0">${CONTACT_METHODS.map(m=>`<option value="${m.val}">${m.label}</option>`).join('')}</select>
+      <input id="cValue" type="text" placeholder="Number, email, or @handle" style="margin-bottom:0"/>
+      <button type="button" onclick="tmpContactAdd()" style="flex-shrink:0;background:var(--bg2);border:1px solid var(--border2);border-radius:var(--radius);padding:0 14px;font-size:18px;font-weight:700;color:var(--wood);cursor:pointer">+</button>
+    </div>
+    <div style="font-size:11px;color:var(--text3);margin:5px 2px 14px">Tap + to add more than one way to reach them.</div>`;
+}
+function renderTmpContacts(){
+  const el=document.getElementById('tmpContacts'); if(!el) return;
+  el.innerHTML=_tmpContacts.map((c,i)=>{
+    const m=CONTACT_METHODS.find(x=>x.val===c.method)||CONTACT_METHODS[5];
+    return `<div class="tmp-contact-row">
+      <span class="tcr-method">${m.label}</span>
+      <span class="tcr-val">${esc(c.value)}</span>
+      <button class="btn-icon" onclick="tmpContactDel(${i})" style="color:var(--red)">&#10005;</button>
+    </div>`;
+  }).join('');
+}
+function tmpContactAdd(){
+  const v=document.getElementById('cValue').value.trim();
+  if(!v) return;
+  _tmpContacts.push({method:document.getElementById('cMethod').value, value:v});
+  document.getElementById('cValue').value='';
+  renderTmpContacts();
+}
+function tmpContactDel(i){ _tmpContacts.splice(i,1); renderTmpContacts(); }
+// If the user typed a contact but never tapped +, capture it on save
+function collectContacts(){
+  const vEl=document.getElementById('cValue');
+  if(vEl && vEl.value.trim()) _tmpContacts.push({method:document.getElementById('cMethod').value, value:vEl.value.trim()});
+  return _tmpContacts;
+}
+function esc(str){ return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;'); }
+
+function followUpFieldHtml(j){
+  const fu=(j&&j.followUp)||{enabled:false,months:6};
+  return `<div class="followup-toggle" onclick="if(event.target.id!=='mFollowUp')document.getElementById('mFollowUp').click()">
+      <input type="checkbox" id="mFollowUp" ${fu.enabled?'checked':''} onclick="event.stopPropagation()" onchange="document.getElementById('fuMonthsWrap').style.display=this.checked?'block':'none'"/>
+      <span style="flex:1">Follow up with client after completion</span>
+    </div>
+    <div id="fuMonthsWrap" style="display:${fu.enabled?'block':'none'}">
+      <label>Check in after</label>
+      <select id="mFollowUpMonths">${[1,3,6,12].map(m=>`<option value="${m}"${m===(fu.months||6)?' selected':''}>${m} month${m>1?'s':''}</option>`).join('')}</select>
+    </div>`;
+}
+function readFollowUpField(){
+  return { enabled:document.getElementById('mFollowUp').checked, months:parseInt(document.getElementById('mFollowUpMonths').value)||6 };
+}
+
 function showAddJobModal(){
+  _tmpContacts=[];
   document.getElementById('modalInner').innerHTML=`
     <div class="modal-title">New Job</div>
     <label>Job Name *</label><input id="mName" type="text" placeholder="e.g. Dining Table Build"/>
     <label>Client</label><input id="mClient" type="text" placeholder="Client name"/>
+    ${contactsFieldHtml()}
     <label>Status</label>
     <select id="mStatus">${STATUS_OPTS.map(s=>`<option value="${s.val}">${s.label}</option>`).join('')}</select>
     <div class="row2">
@@ -1099,11 +1398,13 @@ function showAddJobModal(){
       <div><label>Due Date</label><input id="mDue" type="date"/></div>
     </div>
     <label>Notes</label><textarea id="mNotes" rows="2" placeholder="Species, finish, dimensions..."></textarea>
+    ${followUpFieldHtml(null)}
     <div class="modal-btns">
       <button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
       <button class="btn btn-primary" onclick="addJob()">Create Job</button>
     </div>`;
   openModal();
+  renderTmpContacts();
 }
 function addJob(){
   const name=document.getElementById('mName').value.trim();
@@ -1115,20 +1416,26 @@ function addJob(){
     startDate:document.getElementById('mStart').value,
     dueDate:document.getElementById('mDue').value,
     notes:document.getElementById('mNotes').value.trim(),
+    contacts:collectContacts(),
+    followUp:readFollowUpField(),
+    finishSteps:[],finishNotes:'',
     cuts:[],bfLog:[],photos:[],materials:[],miscMaterials:[],labor:[],
     laborRate:settings.laborRate,markupPct:settings.markupPct,salesTaxPct:settings.salesTaxPct,
     otherCosts:0,otherNotes:''
   });
   save(); closeModal(); renderJobList();
   gcalSyncJob(jobs[0]);
+  reconcileFollowUp(jobs[0]);
 }
 
 function showEditJobModal(id){
   const j=jobs.find(jb=>jb.id===id); if(!j) return;
+  _tmpContacts=(j.contacts||[]).map(c=>({...c}));
   document.getElementById('modalInner').innerHTML=`
     <div class="modal-title">Edit Job</div>
     <label>Job Name *</label><input id="eName" type="text" value="${j.name.replace(/"/g,'&quot;')}"/>
     <label>Client</label><input id="eClient" type="text" value="${(j.client||'').replace(/"/g,'&quot;')}" placeholder="Client name"/>
+    ${contactsFieldHtml()}
     <label>Status</label>
     <select id="eStatus">${STATUS_OPTS.map(s=>`<option value="${s.val}"${s.val===(j.status||'inquiry')?' selected':''}>${s.label}</option>`).join('')}</select>
     <div class="row2">
@@ -1136,11 +1443,13 @@ function showEditJobModal(id){
       <div><label>Due Date</label><input id="eDue" type="date" value="${j.dueDate||''}"/></div>
     </div>
     <label>Notes</label><textarea id="eNotes" rows="3" placeholder="Species, finish, dimensions...">${(j.notes||'').replace(/</g,'&lt;')}</textarea>
+    ${followUpFieldHtml(j)}
     <div class="modal-btns">
       <button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
       <button class="btn btn-primary" onclick="saveJob('${id}')">Save Changes</button>
     </div>`;
   openModal();
+  renderTmpContacts();
 }
 function saveJob(id){
   const j=jobs.find(jb=>jb.id===id); if(!j) return;
@@ -1153,6 +1462,8 @@ function saveJob(id){
   j.startDate=document.getElementById('eStart').value;
   j.dueDate=document.getElementById('eDue').value;
   j.notes=document.getElementById('eNotes').value.trim();
+  j.contacts=collectContacts();
+  j.followUp=readFollowUpField();
   save();
   applyStatusSideEffects(j, wasArchived);
   closeModal();
@@ -1253,7 +1564,70 @@ function saveMat(editIndex){
     mat={name, mode:'bf', pricePerBf:price, bf};
   }
   if(editIndex==null) j.materials.push(mat); else j.materials[editIndex]=mat;
-  save(); closeModal(); renderEstimate();
+  save();
+  // Same lumber yard, same price: offer to update this species across other active jobs
+  const matches=findPriceMatches(mat, j.id);
+  if(matches.entries>0){ showPriceSyncModal(mat, j.id, matches); return; }
+  syncPresetPrice(mat);
+  closeModal(); renderEstimate();
+}
+// Count materials in OTHER active jobs with the same name + pricing mode but a different price
+function findPriceMatches(mat, excludeJobId){
+  const name=mat.name.trim().toLowerCase();
+  let entries=0; const jobIds=new Set();
+  jobs.forEach(j=>{
+    if(j.id===excludeJobId || isArchived(j)) return;
+    (j.materials||[]).forEach(m=>{
+      if((m.mode==='unit')!==(mat.mode==='unit')) return;
+      if(m.name.trim().toLowerCase()!==name) return;
+      const differs = mat.mode==='unit'
+        ? parseFloat(m.unitPrice)!==parseFloat(mat.unitPrice)
+        : parseFloat(m.pricePerBf)!==parseFloat(mat.pricePerBf);
+      if(differs){ entries++; jobIds.add(j.id); }
+    });
+  });
+  return {entries, jobCount:jobIds.size};
+}
+function showPriceSyncModal(mat, excludeJobId, matches){
+  const price = mat.mode==='unit' ? fmt(mat.unitPrice)+(mat.unit?'/'+esc(mat.unit):' each') : fmt(mat.pricePerBf)+'/bf';
+  window._pendingPriceSync={mat, excludeJobId};
+  document.getElementById('modalInner').innerHTML=`
+    <div class="modal-title" style="font-size:18px">Update ${esc(mat.name)} everywhere?</div>
+    <div style="font-size:14px;color:var(--text2);line-height:1.55;margin-bottom:8px">
+      ${matches.entries} other entr${matches.entries===1?'y':'ies'} in ${matches.jobCount} active job${matches.jobCount===1?'':'s'} use${matches.entries===1?'s':''} a different price for <strong>${esc(mat.name)}</strong>.
+      Apply <strong>${price}</strong> to all of them?
+    </div>
+    <div style="font-size:12px;color:var(--text3);margin-bottom:22px">Archived jobs keep their original prices as a record of what you quoted.</div>
+    <div style="display:flex;gap:10px">
+      <button class="btn btn-secondary" style="flex:1" onclick="resolvePriceSync(false)">Just This Job</button>
+      <button class="btn btn-primary" style="flex:1;width:auto;padding:11px" onclick="resolvePriceSync(true)">Update All</button>
+    </div>`;
+}
+function resolvePriceSync(applyAll){
+  const {mat, excludeJobId}=window._pendingPriceSync||{}; window._pendingPriceSync=null;
+  if(applyAll && mat){
+    const name=mat.name.trim().toLowerCase();
+    let entries=0; const jobIds=new Set();
+    jobs.forEach(j=>{
+      if(j.id===excludeJobId || isArchived(j)) return;
+      (j.materials||[]).forEach(m=>{
+        if((m.mode==='unit')!==(mat.mode==='unit')) return;
+        if(m.name.trim().toLowerCase()!==name) return;
+        if(mat.mode==='unit'){ if(parseFloat(m.unitPrice)!==parseFloat(mat.unitPrice)){ m.unitPrice=mat.unitPrice; entries++; jobIds.add(j.id); } }
+        else { if(parseFloat(m.pricePerBf)!==parseFloat(mat.pricePerBf)){ m.pricePerBf=mat.pricePerBf; entries++; jobIds.add(j.id); } }
+      });
+    });
+    save();
+    syncPresetPrice(mat);
+    showToast(`${mat.name} updated in ${jobIds.size} job${jobIds.size===1?'':'s'}`);
+  }
+  closeModal(); renderEstimate();
+}
+// Keep the quick-pick preset chips current so new materials prefill the latest price
+function syncPresetPrice(mat){
+  if(mat.mode==='unit') return;
+  const key=Object.keys(settings.lumberPrices||{}).find(k=>k.trim().toLowerCase()===mat.name.trim().toLowerCase());
+  if(key && settings.lumberPrices[key]!==mat.pricePerBf){ settings.lumberPrices[key]=mat.pricePerBf; saveSettings(); }
 }
 function showAddLaborModal(){
   document.getElementById('modalInner').innerHTML=`
