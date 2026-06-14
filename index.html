@@ -120,6 +120,13 @@ input[type="checkbox"] { width: 19px; height: 19px; margin: 0; accent-color: var
 .tmp-contact-row .tcr-method { font-weight: 700; color: var(--text2); font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; flex-shrink: 0; }
 .tmp-contact-row .tcr-val { flex: 1; font-weight: 500; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
+/* PAYMENTS */
+.pay-row { display: flex; align-items: center; gap: 10px; padding: 11px 13px; background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); margin-bottom: 8px; box-shadow: var(--shadow-sm); }
+.pay-row .pay-method-tag { font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px; color: var(--tan-dark); background: var(--tan-light); padding: 3px 8px; border-radius: 6px; flex-shrink: 0; }
+.pay-row .pay-info { flex: 1; min-width: 0; }
+.pay-row .pay-amt { font-size: 15px; font-weight: 700; color: var(--green); }
+.pay-row .pay-meta { font-size: 12px; font-weight: 500; color: var(--text3); margin-top: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
 /* FINISH RECIPE */
 .finish-step { display: flex; align-items: flex-start; gap: 12px; padding: 13px 0; border-bottom: 1px solid var(--border); }
 .finish-step:last-child { border-bottom: none; }
@@ -352,17 +359,11 @@ input[type="checkbox"] { width: 19px; height: 19px; margin: 0; accent-color: var
           <div><label>Other costs ($)</label><div class="prefix"><span>$</span><input type="number" id="otherCosts" placeholder="0" onchange="saveOther()"/></div></div>
         </div>
         <textarea id="otherNotes" rows="2" placeholder="Hardware, finish, delivery..." onchange="saveOther()"></textarea>
-        <div class="slabel">Deposit</div>
-        <div class="row2">
-          <div>
-            <label>Deposit amount ($)</label>
-            <div class="prefix"><span>$</span><input type="number" id="depositAmt" placeholder="0" step="0.01" onchange="saveDeposit()"/></div>
-          </div>
-          <div>
-            <label>Date received</label>
-            <input type="date" id="depositDate" onchange="saveDeposit()"/>
-          </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-top:18px;margin-bottom:8px">
+          <div class="slabel" style="margin:0">Payments received</div>
+          <button class="btn btn-secondary" onclick="showAddPaymentModal()" style="padding:8px 14px;font-size:13px">+ Add Payment</button>
         </div>
+        <div id="paymentList"></div>
       </div>
     </div>
     <div class="photo-action-bar" id="photoActionBar" style="display:none">
@@ -459,6 +460,13 @@ jobs.forEach(j=>{
   (j.miscMaterials||[]).forEach(m=>{
     if(m.unitPrice==null && m.cost!=null){ m.qty=1; m.unitPrice=m.cost; delete m.cost; migrated=true; }
   });
+  if(!j.payments){
+    j.payments = (parseFloat(j.depositAmt)>0)
+      ? [{amount:parseFloat(j.depositAmt), method:'Check', date:j.depositDate||'', note:'Deposit'}]
+      : [];
+    delete j.depositAmt; delete j.depositDate;
+    migrated=true;
+  }
   if(j.photos && j.photos.length){
     photoStore[j.id]=j.photos;
     j.photos=[];
@@ -620,6 +628,8 @@ function jobCardHtml(j, archived){
       ${bf>0?`<span class="pill ${archived?'pill-gray':'pill-tan'}">${bf.toFixed(1)} bf</span>`:''}
       ${photos?`<span class="pill ${archived?'pill-gray':'pill-tan'}">${photos} photo${photos>1?'s':''}</span>`:''}
       ${est.total>0?`<span class="pill ${archived?'pill-gray':'pill-green'}">${fmt(est.total)}</span>`:''}
+      ${est.paid>0&&est.balance>0?`<span class="pill" style="background:#fae3cf;color:#7a3d00">${fmt(est.balance)} due</span>`:''}
+      ${est.paid>0&&est.balance===0?`<span class="pill ${archived?'pill-gray':''}" style="${archived?'':'background:#d8ecd8;color:#1a6b3a'}">Paid</span>`:''}
       ${j.followUpDate&&!j.followUpDone?`<span class="pill" style="background:#fae3cf;color:#7a3d00">Follow up ${fmtDateShort(j.followUpDate)}</span>`:''}
     </div>
   </div>`;
@@ -1117,9 +1127,9 @@ function calcEst(job){
   const override=(job.totalOverride!=null && !isNaN(parseFloat(job.totalOverride)))?parseFloat(job.totalOverride):null;
   const finalTotal=override!=null?override:total;
   const roundingAdj=override!=null?(override-total):0;
-  const deposit=parseFloat(job.depositAmt||0);
-  const balance=Math.max(0,finalTotal-deposit);
-  return {matTotal,miscTotal,laborTotal,other,sub,markup,tax,total,override,finalTotal,roundingAdj,rate,deposit,balance};
+  const paid=(job.payments||[]).reduce((s,p)=>s+(parseFloat(p.amount)||0),0);
+  const balance=Math.max(0,finalTotal-paid);
+  return {matTotal,miscTotal,laborTotal,other,sub,markup,tax,total,override,finalTotal,roundingAdj,rate,paid,balance};
 }
 function renderEstimate(){
   const j=getJob(); const e=calcEst(j);
@@ -1138,8 +1148,8 @@ function renderEstimate(){
       ${e.override!=null?`<div class="cost-line"><span>Calculated</span><span>${fmt(e.total)}</span></div>`:''}
       ${e.override!=null?`<div class="cost-line"><span>Rounding</span><span>${e.roundingAdj>=0?'+':'-'}${fmt(Math.abs(e.roundingAdj))}</span></div>`:''}
       <div class="cost-line total"><span>Total</span><span>${fmt(e.finalTotal)}</span></div>
-      ${e.deposit>0?`<div class="cost-line" style="color:var(--text2)"><span>Deposit received${j.depositDate?' ('+j.depositDate+')':''}</span><span style="color:var(--green)">-${fmt(e.deposit)}</span></div>`:'' }
-      ${e.deposit>0?`<div class="cost-line total" style="border-top:2px solid var(--wood)"><span>Balance due</span><span>${fmt(e.balance)}</span></div>`:'' }
+      ${e.paid>0?`<div class="cost-line" style="color:var(--text2)"><span>Paid to date${(j.payments||[]).length>1?' ('+(j.payments||[]).length+' payments)':''}</span><span style="color:var(--green)">-${fmt(e.paid)}</span></div>`:'' }
+      ${e.paid>0?`<div class="cost-line total" style="border-top:2px solid var(--wood)"><span>Balance due</span><span>${fmt(e.balance)}</span></div>`:'' }
       <div style="padding:12px 14px 14px;text-align:right">
         <button onclick="showRoundModal()" style="background:var(--bg2);border:1px solid var(--border2);border-radius:8px;padding:7px 14px;color:var(--wood);font-size:12px;font-weight:700;cursor:pointer">${e.override!=null?'Edit rounding':'Round total'}</button>
       </div>
@@ -1162,8 +1172,7 @@ function renderEstimate(){
   document.getElementById('salesTaxPct').value=j.salesTaxPct??settings.salesTaxPct;
   document.getElementById('otherCosts').value=j.otherCosts||'';
   document.getElementById('otherNotes').value=j.otherNotes||'';
-  document.getElementById('depositAmt').value=j.depositAmt||'';
-  document.getElementById('depositDate').value=j.depositDate||'';
+  renderPayments(j);
   // Misc materials
   const miscEl=document.getElementById('miscMatList');
   miscEl.innerHTML=(j.miscMaterials||[]).length?
@@ -1196,7 +1205,78 @@ function saveLaborRate(){ const j=getJob(); j.laborRate=parseFloat(document.getE
 function saveMarkup(){ const j=getJob(); j.markupPct=parseFloat(document.getElementById('markupPct').value)||0; save(); renderEstimate(); }
 function saveSalesTax(){ const j=getJob(); j.salesTaxPct=parseFloat(document.getElementById('salesTaxPct').value)||0; save(); renderEstimate(); }
 function saveOther(){ const j=getJob(); j.otherCosts=parseFloat(document.getElementById('otherCosts').value)||0; j.otherNotes=document.getElementById('otherNotes').value; save(); renderEstimate(); }
-function saveDeposit(){ const j=getJob(); j.depositAmt=parseFloat(document.getElementById('depositAmt').value)||0; j.depositDate=document.getElementById('depositDate').value||''; save(); renderEstimate(); }
+const PAY_METHODS=['Check','Cash','Zelle','Venmo','PayPal','Card','Bank transfer','Other'];
+function renderPayments(j){
+  const el=document.getElementById('paymentList'); if(!el) return;
+  const pays=j.payments||[];
+  if(!pays.length){ el.innerHTML=`<div style="color:var(--text3);font-size:14px;font-weight:500;margin-bottom:4px">No payments logged yet. Add a deposit or payment as you receive it.</div>`; return; }
+  el.innerHTML=pays.map((p,i)=>`<div class="pay-row">
+      <span class="pay-method-tag">${esc(p.method||'Other')}</span>
+      <div class="pay-info">
+        <div class="pay-amt">${fmt(p.amount)}</div>
+        <div class="pay-meta">${p.date?fmtDateShort(p.date):'No date'}${p.note?' · '+esc(p.note):''}</div>
+      </div>
+      <button class="btn-icon" onclick="showEditPaymentModal(${i})" title="Edit">&#9998;</button>
+      <button class="btn-icon" onclick="delPayment(${i})" style="color:var(--red)">&#10005;</button>
+    </div>`).join('');
+}
+function paymentModalFields(p){
+  p=p||{};
+  const today=new Date().toISOString().split('T')[0];
+  return `<label>Amount ($) *</label>
+    <div class="prefix"><span>$</span><input id="pAmount" type="number" step="0.01" placeholder="0.00" value="${p.amount!=null?p.amount:''}"/></div>
+    <label>Method</label>
+    <select id="pMethod">${PAY_METHODS.map(m=>`<option value="${m}"${m===(p.method||'Check')?' selected':''}>${m}</option>`).join('')}</select>
+    <label>Date received</label>
+    <input id="pDate" type="date" value="${p.date||today}"/>
+    <label>Note</label>
+    <input id="pNote" type="text" placeholder="Deposit, progress payment, final..." value="${esc(p.note||'')}"/>`;
+}
+function showAddPaymentModal(){
+  document.getElementById('modalInner').innerHTML=`
+    <div class="modal-title">Add Payment</div>
+    ${paymentModalFields()}
+    <div class="modal-btns">
+      <button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="addPayment()">Add Payment</button>
+    </div>`;
+  openModal();
+}
+function readPaymentModal(){
+  const amount=parseFloat(document.getElementById('pAmount').value);
+  if(!amount || amount<=0){ alert('Enter a payment amount.'); return null; }
+  return { amount, method:document.getElementById('pMethod').value, date:document.getElementById('pDate').value||'', note:document.getElementById('pNote').value.trim() };
+}
+function addPayment(){
+  const p=readPaymentModal(); if(!p) return;
+  const j=getJob(); if(!j.payments) j.payments=[];
+  j.payments.push(p);
+  j.payments.sort((a,b)=>(a.date||'').localeCompare(b.date||''));
+  save(); closeModal(); renderEstimate();
+}
+function showEditPaymentModal(i){
+  const j=getJob(); const p=(j.payments||[])[i]; if(!p) return;
+  document.getElementById('modalInner').innerHTML=`
+    <div class="modal-title">Edit Payment</div>
+    ${paymentModalFields(p)}
+    <div class="modal-btns">
+      <button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="savePayment(${i})">Save Changes</button>
+    </div>`;
+  openModal();
+}
+function savePayment(i){
+  const p=readPaymentModal(); if(!p) return;
+  const j=getJob();
+  j.payments[i]=p;
+  j.payments.sort((a,b)=>(a.date||'').localeCompare(b.date||''));
+  save(); closeModal(); renderEstimate();
+}
+function delPayment(i){
+  const j=getJob();
+  j.payments.splice(i,1);
+  save(); renderEstimate();
+}
 function showRoundModal(){
   const j=getJob(); const e=calcEst(j);
   const mk=v=>`<div class="chip" onclick="fillRound(${v})">Nearest $${v}</div>`;
@@ -1279,10 +1359,13 @@ function buildShareText(job, itemized){
     if(e.tax>0)      lines.push(('Sales tax ('+taxPct+'%)').padEnd(20)+fmt(e.tax));
     lines.push('───────────────────────────','TOTAL'.padEnd(20)+fmt(e.finalTotal),'═══════════════════════════');
   }
-  if(e.deposit>0){
-    lines.push('Deposit received    '+fmt(e.deposit));
-    if(job.depositDate) lines.push('Deposit date        '+job.depositDate);
-    lines.push('BALANCE DUE         '+fmt(e.balance),'═══════════════════════════');
+  if(e.paid>0){
+    (job.payments||[]).forEach(p=>{
+      const lbl=(p.method||'Payment')+(p.date?' '+p.date:'');
+      lines.push(lbl.padEnd(20)+fmt(p.amount));
+    });
+    lines.push('Paid to date'.padEnd(20)+fmt(e.paid));
+    lines.push('BALANCE DUE'.padEnd(20)+fmt(e.balance),'═══════════════════════════');
   }
   if(itemized && (job.cuts||[]).length){
     lines.push('','CUT LIST','───────────────────────────');
