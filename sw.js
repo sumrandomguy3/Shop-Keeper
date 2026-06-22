@@ -1,4 +1,4 @@
-const CACHE = 'shopkeeper-v17';
+const CACHE = 'shopkeeper-v18';
 const BASE = '/Shop-Keeper/';
 
 self.addEventListener('install', e => {

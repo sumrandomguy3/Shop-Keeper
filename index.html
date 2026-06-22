@@ -420,6 +420,8 @@ const SETTINGS_DEFAULTS = {
   laborRate: 65,
   markupPct: 0,
   salesTaxPct: 0,
+  business: { name:'', phone:'', email:'', address:'' },
+  nextInvoiceNo: 1,
   lumberPrices: {
     'Pine':       4.50,
     'Poplar':     5.00,
@@ -437,10 +439,13 @@ const SETTINGS_DEFAULTS = {
 let settings = {...SETTINGS_DEFAULTS};
 try {
   const s = JSON.parse(localStorage.getItem(SETTINGS_KEY)||'null');
-  if(s) settings = {...SETTINGS_DEFAULTS, ...s, lumberPrices:{...SETTINGS_DEFAULTS.lumberPrices,...(s.lumberPrices||{})}};
+  if(s) settings = {...SETTINGS_DEFAULTS, ...s, business:{...SETTINGS_DEFAULTS.business,...(s.business||{})}, lumberPrices:{...SETTINGS_DEFAULTS.lumberPrices,...(s.lumberPrices||{})}};
 } catch(e){}
 
 function saveSettings(){ try{ localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings)); }catch(e){} }
+const LOGO_KEY = 'wj_logo';
+function getLogo(){ try{ return localStorage.getItem(LOGO_KEY)||''; }catch(e){ return ''; } }
+function setLogo(d){ try{ if(d) localStorage.setItem(LOGO_KEY,d); else localStorage.removeItem(LOGO_KEY); return true; }catch(e){ return false; } }
 function getLumberPresets(){ return Object.entries(settings.lumberPrices).map(([name,price])=>({name,price})); }
 
 // Load jobs (without photos)
@@ -499,6 +504,8 @@ if(migrated){ save(); savePhotos(); }
 
 function getJob(){ return jobs.find(j=>j.id===currentJobId); }
 function fmt(n){ return '$'+parseFloat(n||0).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g,','); }
+function escHtml(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function escAttr(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;'); }
 function urgColor(u){ return u==='urgent'?'var(--red)':u==='warning'?'var(--orange)':u==='soon'?'var(--yellow)':'var(--green)'; }
 
 function urgency(job){
@@ -1024,6 +1031,48 @@ function compressImage(file){
     } else { fallback(); }
   });
 }
+function compressLogo(file){
+  return new Promise(resolve=>{
+    const MAX=600;
+    const finish=canvas=>{ try{ resolve(canvas.toDataURL('image/png')); }catch(err){ resolve(null); } };
+    const draw=(srcImg,w,h)=>{
+      let nw=w, nh=h;
+      if(w>=h && w>MAX){ nh=Math.round(h*MAX/w); nw=MAX; }
+      else if(h>w && h>MAX){ nw=Math.round(w*MAX/h); nh=MAX; }
+      else if(w===h && w>MAX){ nw=nh=MAX; }
+      const c=document.createElement('canvas'); c.width=nw; c.height=nh;
+      c.getContext('2d').drawImage(srcImg,0,0,nw,nh);
+      finish(c);
+    };
+    const fallback=()=>{
+      const reader=new FileReader();
+      reader.onload=ev=>{ const img=new Image(); img.onload=()=>draw(img,img.naturalWidth,img.naturalHeight); img.onerror=()=>resolve(null); img.src=ev.target.result; };
+      reader.onerror=()=>resolve(null);
+      reader.readAsDataURL(file);
+    };
+    if(window.createImageBitmap){
+      createImageBitmap(file,{imageOrientation:'from-image'}).then(bmp=>{ draw(bmp,bmp.width,bmp.height); if(bmp.close) bmp.close(); }).catch(fallback);
+    } else { fallback(); }
+  });
+}
+async function handleLogoUpload(e){
+  const file=e.target.files&&e.target.files[0]; e.target.value='';
+  if(!file) return;
+  const data=await compressLogo(file);
+  if(!data){ showToast('Could not read image'); return; }
+  if(!setLogo(data)){ showToast('Logo too large to save'); return; }
+  refreshLogoPreview();
+  showToast('Logo saved');
+}
+function removeLogo(){ setLogo(''); refreshLogoPreview(); showToast('Logo removed'); }
+function refreshLogoPreview(){
+  const box=document.getElementById('logoPreviewBox'); if(!box) return;
+  const logo=getLogo();
+  box.innerHTML = logo
+    ? `<img src="${logo}" alt="Logo" style="max-height:56px;max-width:150px;object-fit:contain;background:#fff;border-radius:6px;padding:4px"/>
+       <button class="btn btn-secondary" style="padding:6px 12px;font-size:13px" onclick="removeLogo()">Remove</button>`
+    : `<span style="color:var(--text3);font-size:13px">No logo uploaded yet</span>`;
+}
 async function handlePhoto(e){
   const files=Array.from(e.target.files); e.target.value='';
   if(!files.length) return;
@@ -1396,10 +1445,158 @@ function renderShareModal(){
       <button class="btn btn-green" style="flex:1" onclick="shareEst()">&#8679; Share</button>
     </div>
     <div class="copy-ok" id="copyOk"></div>
-    <button class="btn btn-secondary" onclick="closeModal()" style="width:100%;margin-top:10px">Done</button>`;
+    <div style="height:1px;background:var(--border2);margin:16px 0 12px"></div>
+    <div class="slabel" style="margin-top:0">Branded PDF</div>
+    <div style="font-size:12px;color:var(--text3);margin-bottom:10px">Letterhead document with your logo (set it in Settings). Uses the ${itemized?'Itemized':'Summary'} layout selected above. Opens your print / share sheet — pick &ldquo;Save to Files&rdquo; or share to Mail, Messages, etc.</div>
+    <div style="display:flex;gap:10px">
+      <button class="btn btn-secondary" style="flex:1" onclick="printDoc('estimate')">Estimate PDF</button>
+      <button class="btn btn-green" style="flex:1" onclick="printDoc('invoice')">Invoice PDF</button>
+    </div>
+    <button class="btn btn-secondary" onclick="closeModal()" style="width:100%;margin-top:14px">Done</button>`;
 }
 function copyEst(){ navigator.clipboard.writeText(window._shareText||'').then(()=>{ const el=document.getElementById('copyOk'); el.textContent='Copied to clipboard!'; setTimeout(()=>el.textContent='',2500); }).catch(()=>{ document.getElementById('copyOk').textContent='Select text above to copy manually.'; }); }
 function shareEst(){ if(navigator.share) navigator.share({title:'Estimate',text:window._shareText||''}).catch(()=>{}); else copyEst(); }
+
+// ── CLIENT-FACING PDF DOCUMENT (estimate / invoice) ──
+function assignInvoiceNo(job){
+  if(job.invoiceNo) return job.invoiceNo;
+  const n=settings.nextInvoiceNo||1;
+  job.invoiceNo='INV-'+String(n).padStart(4,'0');
+  settings.nextInvoiceNo=n+1;
+  saveSettings(); save();
+  return job.invoiceNo;
+}
+function buildDocHTML(job, opts){
+  opts=opts||{};
+  const type = opts.type==='invoice' ? 'invoice' : 'estimate';
+  const itemized = opts.itemized!==false;
+  const e=calcEst(job);
+  const biz=settings.business||{};
+  const logo=getLogo();
+  const taxPct=parseFloat(job.salesTaxPct??settings.salesTaxPct??0);
+  const nonTax=e.finalTotal - e.tax;            // markup + rounding folded in, tax excluded
+  const k = e.sub>0 ? nonTax/e.sub : 1;          // proportional fold factor (hides markup)
+  const r2=x=>Math.round(x*100)/100;
+  const issued=new Date().toLocaleDateString('en-US',{year:'numeric',month:'long',day:'numeric'});
+  const title = type==='invoice' ? 'Invoice' : 'Estimate';
+  const docNo = type==='invoice' ? (job.invoiceNo||'') : '';
+
+  // itemized base lines, each at final (folded) price — no hours, no markup line
+  let baseLines=[];
+  (job.materials||[]).forEach(m=> baseLines.push({sec:'Materials', label:m.name, amt:matLineTotal(m)*k}));
+  (job.miscMaterials||[]).forEach(m=> baseLines.push({sec:'Materials', label:m.name, amt:miscLineTotal(m)*k}));
+  if(e.other>0) baseLines.push({sec:'Materials', label:(job.otherNotes||'Additional materials'), amt:e.other*k});
+  (job.labor||[]).forEach(l=> baseLines.push({sec:'Labor', label:l.desc, amt:(l.hours*e.rate)*k}));
+  baseLines = baseLines.map(x=>({sec:x.sec, label:x.label, amt:r2(x.amt)}));
+  if(baseLines.length){ // absorb rounding remainder so lines sum exactly to subtotal
+    const diff=r2(nonTax - baseLines.reduce((s,x)=>s+x.amt,0));
+    baseLines[baseLines.length-1].amt = r2(baseLines[baseLines.length-1].amt + diff);
+  }
+
+  // summary figures (folded)
+  const matBase=e.matTotal+e.miscTotal+e.other;
+  const base=matBase+e.laborTotal;
+  const matShown = base>0 ? r2(nonTax*(matBase/base)) : r2(nonTax);
+  const laborShown = r2(nonTax - matShown);
+
+  const row=(label,amt,cls='')=>`<tr class="${cls}"><td class="lbl">${escHtml(label)}</td><td class="amt">${fmt(amt)}</td></tr>`;
+
+  let itemsHTML='';
+  if(itemized && baseLines.length){
+    ['Materials','Labor'].forEach(sec=>{
+      const rows=baseLines.filter(x=>x.sec===sec);
+      if(!rows.length) return;
+      itemsHTML += `<tr class="sec"><td colspan="2">${sec}</td></tr>`;
+      rows.forEach(x=> itemsHTML += row(x.label, x.amt));
+    });
+  } else {
+    if(matShown>0) itemsHTML += row('Materials', matShown);
+    if(laborShown>0) itemsHTML += row('Labor', laborShown);
+  }
+
+  let totalsHTML = `<tr class="sub"><td class="lbl">Subtotal</td><td class="amt">${fmt(nonTax)}</td></tr>`;
+  if(e.tax>0) totalsHTML += `<tr><td class="lbl">Sales tax (${taxPct}%)</td><td class="amt">${fmt(e.tax)}</td></tr>`;
+  totalsHTML += `<tr class="tot"><td class="lbl">Total</td><td class="amt">${fmt(e.finalTotal)}</td></tr>`;
+
+  let payHTML='';
+  if(e.paid>0){
+    (job.payments||[]).forEach(p=>{
+      const lbl=(p.method||'Payment')+(p.date?' · '+p.date:'');
+      payHTML += `<tr class="pay"><td class="lbl">${escHtml(lbl)}</td><td class="amt">−${fmt(p.amount)}</td></tr>`;
+    });
+    payHTML += `<tr class="pay"><td class="lbl">Paid to date</td><td class="amt">−${fmt(e.paid)}</td></tr>`;
+  }
+
+  const balanceBlock = (type==='invoice')
+    ? `<div class="balance ${e.balance<=0?'paid':''}"><span class="bl-label">${e.balance<=0?'Paid in full':'Balance due'}</span><span class="bl-amt">${fmt(e.balance)}</span></div>`
+    : (e.paid>0 ? `<div class="balance"><span class="bl-label">Balance</span><span class="bl-amt">${fmt(e.balance)}</span></div>` : '');
+
+  const bizName = escHtml(biz.name||'');
+  const contactBits=[biz.phone,biz.email,biz.address].filter(Boolean).map(escHtml).join('&nbsp;&nbsp;·&nbsp;&nbsp;');
+
+  return `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>${escHtml(title)} — ${escHtml(job.name||'')}</title>
+<style>
+@page{ margin:18mm 16mm; }
+*{ box-sizing:border-box; }
+html,body{ margin:0; padding:0; }
+body{ font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif; color:#211d17; background:#fff; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+.sheet{ max-width:720px; margin:0 auto; padding:28px 24px; }
+.head{ display:flex; align-items:flex-start; justify-content:space-between; gap:20px; }
+.brand{ display:flex; align-items:center; gap:16px; }
+.brand img{ max-height:64px; max-width:170px; object-fit:contain; }
+.biz-name{ font-family:Georgia,"Times New Roman",serif; font-size:22px; font-weight:700; line-height:1.1; }
+.biz-contact{ font-size:11px; color:#8a8175; margin-top:5px; }
+.doc-meta{ text-align:right; white-space:nowrap; }
+.doc-type{ font-family:Georgia,serif; font-size:24px; font-weight:700; color:#6b4f3a; letter-spacing:1px; }
+.doc-sub{ font-size:11px; color:#8a8175; margin-top:4px; line-height:1.6; }
+.rule{ height:2px; background:#6b4f3a; margin-top:16px; }
+.parties{ display:flex; justify-content:space-between; gap:20px; margin:18px 0 6px; }
+.party .k{ font-size:10px; text-transform:uppercase; letter-spacing:1px; color:#6b4f3a; margin-bottom:3px; }
+.party .v{ font-size:14px; font-weight:600; }
+table.items{ width:100%; border-collapse:collapse; margin-top:14px; }
+table.items td{ padding:7px 0; font-size:13px; vertical-align:top; }
+table.items td.amt{ text-align:right; white-space:nowrap; font-variant-numeric:tabular-nums; padding-left:20px; }
+tr.sec td{ font-size:10px; text-transform:uppercase; letter-spacing:1.2px; color:#6b4f3a; padding-top:14px; padding-bottom:2px; border-bottom:1px solid #e7e2d8; }
+tr.sub td{ border-top:1px solid #e7e2d8; padding-top:10px; color:#5a544b; }
+tr.tot td{ font-family:Georgia,serif; font-size:17px; font-weight:700; padding-top:6px; }
+tr.pay td{ color:#8a8175; font-size:12px; }
+.balance{ display:flex; justify-content:space-between; align-items:center; margin-top:18px; padding:14px 18px; border:1.5px solid #6b4f3a; border-radius:8px; }
+.balance .bl-label{ font-size:11px; text-transform:uppercase; letter-spacing:1.5px; color:#6b4f3a; }
+.balance .bl-amt{ font-family:Georgia,serif; font-size:22px; font-weight:700; }
+.balance.paid{ border-color:#3f7d4f; }
+.balance.paid .bl-label,.balance.paid .bl-amt{ color:#3f7d4f; }
+.foot{ margin-top:26px; font-size:11px; color:#8a8175; line-height:1.7; }
+.foot .thanks{ font-family:Georgia,serif; font-style:italic; font-size:14px; color:#6b4f3a; margin-bottom:6px; }
+</style></head>
+<body><div class="sheet">
+<div class="head">
+<div class="brand">${logo?`<img src="${logo}" alt="">`:''}${bizName?`<div><div class="biz-name">${bizName}</div>${contactBits?`<div class="biz-contact">${contactBits}</div>`:''}</div>`:''}</div>
+<div class="doc-meta"><div class="doc-type">${escHtml(title.toUpperCase())}</div><div class="doc-sub">${docNo?('No. '+escHtml(docNo)+'<br>'):''}${issued}</div></div>
+</div>
+<div class="rule"></div>
+<div class="parties"><div class="party"><div class="k">Prepared for</div><div class="v">${escHtml(job.client||'—')}</div></div><div class="party" style="text-align:right"><div class="k">Project</div><div class="v">${escHtml(job.name||'—')}</div></div></div>
+<table class="items">${itemsHTML}${totalsHTML}${payHTML}</table>
+${balanceBlock}
+<div class="foot"><div class="thanks">Thank you for your business.</div>${type==='estimate'?'This estimate is valid for 30 days from the date above.':''}</div>
+</div></body></html>`;
+}
+function printDoc(type){
+  const job=getJob(); if(!job) return;
+  const itemized=window._shareItemized!==false;
+  if(type==='invoice') assignInvoiceNo(job);
+  const html=buildDocHTML(job,{type:type, itemized:itemized});
+  let f=document.getElementById('printFrame'); if(f) f.remove();
+  f=document.createElement('iframe'); f.id='printFrame';
+  f.style.cssText='position:fixed;right:0;bottom:0;width:1px;height:1px;border:0;opacity:0';
+  document.body.appendChild(f);
+  const doc=f.contentWindow.document;
+  doc.open(); doc.write(html); doc.close();
+  const go=()=>{ try{ f.contentWindow.focus(); f.contentWindow.print(); }catch(err){ showToast('Could not open print dialog'); } };
+  const img=doc.querySelector('img');
+  if(img && !img.complete){ img.onload=()=>setTimeout(go,80); img.onerror=()=>setTimeout(go,80); }
+  else setTimeout(go,150);
+}
 
 // MODALS
 function openModal(){ document.getElementById('modalWrap').style.display='block'; }
@@ -1770,7 +1967,23 @@ function showSettingsModal(){
   const lp=settings.lumberPrices;
   document.getElementById('modalInner').innerHTML=`
     <div class="modal-title">&#9881; Settings</div>
-    <div class="slabel" style="margin-top:0">Global defaults</div>
+    <div class="slabel" style="margin-top:0">Business profile</div>
+    <div style="font-size:12px;color:var(--text3);margin-bottom:10px">Appears on the estimate &amp; invoice PDFs your clients receive.</div>
+    <label>Business name</label>
+    <input id="sBizName" type="text" value="${escAttr(settings.business&&settings.business.name)}" placeholder="e.g. Oakline Furniture Co."/>
+    <div class="row2">
+      <div><label>Phone</label><input id="sBizPhone" type="text" value="${escAttr(settings.business&&settings.business.phone)}" placeholder="(555) 123-4567"/></div>
+      <div><label>Email</label><input id="sBizEmail" type="text" value="${escAttr(settings.business&&settings.business.email)}" placeholder="you@shop.com"/></div>
+    </div>
+    <label>Address / location</label>
+    <input id="sBizAddr" type="text" value="${escAttr(settings.business&&settings.business.address)}" placeholder="City, State"/>
+    <label style="margin-top:12px">Logo</label>
+    <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:12px 14px;background:var(--bg2);border:1px solid var(--border2);border-radius:var(--radius)">
+      <div id="logoPreviewBox" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap"></div>
+      <button class="btn btn-secondary" style="padding:6px 12px;font-size:13px;margin-left:auto;flex:0 0 auto" onclick="document.getElementById('logoFile').click()">Upload logo</button>
+    </div>
+    <input type="file" id="logoFile" accept="image/*" style="display:none" onchange="handleLogoUpload(event)"/>
+    <div class="slabel">Global defaults</div>
     <div style="font-size:12px;color:var(--text3);margin-bottom:10px">These apply to new jobs. Existing jobs keep their own values.</div>
     <div class="row2">
       <div><label>Default labor rate ($/hr)</label>
@@ -1806,8 +2019,15 @@ function showSettingsModal(){
     </div>`;
   openModal();
   renderGcalSettingsRow();
+  refreshLogoPreview();
 }
 function saveSettingsModal(){
+  settings.business = {
+    name:(document.getElementById('sBizName').value||'').trim(),
+    phone:(document.getElementById('sBizPhone').value||'').trim(),
+    email:(document.getElementById('sBizEmail').value||'').trim(),
+    address:(document.getElementById('sBizAddr').value||'').trim()
+  };
   settings.laborRate=parseFloat(document.getElementById('sLaborRate').value)||65;
   settings.markupPct=parseFloat(document.getElementById('sMarkup').value)||0;
   settings.salesTaxPct=parseFloat(document.getElementById('sTax').value)||0;
@@ -1824,11 +2044,12 @@ function saveSettingsModal(){
 // DATA EXPORT / IMPORT
 function exportData(){
   const payload = {
-    version: 1,
+    version: 2,
     exportedAt: new Date().toISOString(),
     jobs: JSON.parse(localStorage.getItem(JOBS_KEY)||'[]'),
     photos: JSON.parse(localStorage.getItem(PHOTOS_KEY)||'{}'),
-    settings: JSON.parse(localStorage.getItem(SETTINGS_KEY)||'{}')
+    settings: JSON.parse(localStorage.getItem(SETTINGS_KEY)||'{}'),
+    logo: localStorage.getItem(LOGO_KEY)||''
   };
   const blob = new Blob([JSON.stringify(payload, null, 2)], {type:'application/json'});
   const url = URL.createObjectURL(blob);
@@ -1850,6 +2071,7 @@ function importData(event){
       if(payload.jobs)     localStorage.setItem(JOBS_KEY,     JSON.stringify(payload.jobs));
       if(payload.photos)   localStorage.setItem(PHOTOS_KEY,   JSON.stringify(payload.photos));
       if(payload.settings) localStorage.setItem(SETTINGS_KEY, JSON.stringify(payload.settings));
+      if('logo' in payload){ if(payload.logo) localStorage.setItem(LOGO_KEY, payload.logo); else localStorage.removeItem(LOGO_KEY); }
       const st = document.getElementById('importStatus');
       if(st) st.textContent = 'Import successful — reloading...';
       setTimeout(()=>location.reload(), 1200);
