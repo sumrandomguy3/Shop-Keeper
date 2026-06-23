@@ -1448,6 +1448,11 @@ function renderShareModal(){
     <div style="height:1px;background:var(--border2);margin:16px 0 12px"></div>
     <div class="slabel" style="margin-top:0">Branded PDF</div>
     <div style="font-size:12px;color:var(--text3);margin-bottom:10px">Letterhead document with your logo (set it in Settings). Uses the ${itemized?'Itemized':'Summary'} layout selected above. Opens your print / share sheet — pick &ldquo;Save to Files&rdquo; or share to Mail, Messages, etc.</div>
+    <label style="font-size:13px">Invoice number</label>
+    <div style="display:flex;gap:8px;align-items:stretch;margin-bottom:12px">
+      <input id="invNoInput" type="text" value="${escAttr(getInvoiceNo(job))}" oninput="saveInvNo(this.value)" style="flex:1" placeholder="e.g. ${escAttr(defaultJobNo(job))}-01"/>
+      <button class="btn btn-secondary" style="flex:0 0 auto;padding:0 16px;font-size:13px" onclick="bumpInvoiceNo()">Next #</button>
+    </div>
     <div style="display:flex;gap:10px">
       <button class="btn btn-secondary" style="flex:1" onclick="printDoc('estimate')">Estimate PDF</button>
       <button class="btn btn-green" style="flex:1" onclick="printDoc('invoice')">Invoice PDF</button>
@@ -1458,13 +1463,27 @@ function copyEst(){ navigator.clipboard.writeText(window._shareText||'').then(()
 function shareEst(){ if(navigator.share) navigator.share({title:'Estimate',text:window._shareText||''}).catch(()=>{}); else copyEst(); }
 
 // ── CLIENT-FACING PDF DOCUMENT (estimate / invoice) ──
+function defaultJobNo(job){
+  const t=parseInt(job.id,10);
+  const d=(!isNaN(t)&&t>0)?new Date(t):new Date();
+  const yy=String(d.getFullYear()).slice(-2);
+  const mm=String(d.getMonth()+1).padStart(2,'0');
+  const dd=String(d.getDate()).padStart(2,'0');
+  return yy+'-'+mm+dd;
+}
+function getJobNo(job){ return (job.jobNo&&String(job.jobNo).trim())?String(job.jobNo).trim():defaultJobNo(job); }
+function defaultInvoiceNo(job){ return getJobNo(job)+'-'+String(parseInt(job.invoiceSeq,10)||1).padStart(2,'0'); }
+function getInvoiceNo(job){ return (job.invoiceNo&&String(job.invoiceNo).trim())?String(job.invoiceNo).trim():defaultInvoiceNo(job); }
 function assignInvoiceNo(job){
-  if(job.invoiceNo) return job.invoiceNo;
-  const n=settings.nextInvoiceNo||1;
-  job.invoiceNo='INV-'+String(n).padStart(4,'0');
-  settings.nextInvoiceNo=n+1;
-  saveSettings(); save();
+  if(!job.invoiceNo || !String(job.invoiceNo).trim()){ job.invoiceNo=defaultInvoiceNo(job); save(); }
   return job.invoiceNo;
+}
+function saveInvNo(v){ const j=getJob(); if(!j) return; v=(v||'').trim(); if(v) j.invoiceNo=v; else delete j.invoiceNo; save(); }
+function bumpInvoiceNo(){
+  const j=getJob(); if(!j) return;
+  j.invoiceSeq=(parseInt(j.invoiceSeq,10)||1)+1;
+  j.invoiceNo=defaultInvoiceNo(j);
+  save(); renderShareModal();
 }
 function buildDocHTML(job, opts){
   opts=opts||{};
@@ -1479,7 +1498,7 @@ function buildDocHTML(job, opts){
   const r2=x=>Math.round(x*100)/100;
   const issued=new Date().toLocaleDateString('en-US',{year:'numeric',month:'long',day:'numeric'});
   const title = type==='invoice' ? 'Invoice' : 'Estimate';
-  const docNo = type==='invoice' ? (job.invoiceNo||'') : '';
+  const docNo = type==='invoice' ? getInvoiceNo(job) : '';
 
   // itemized base lines, each at final (folded) price — no hours, no markup line
   let baseLines=[];
@@ -1703,6 +1722,7 @@ function addJob(){
     laborRate:settings.laborRate,markupPct:settings.markupPct,salesTaxPct:settings.salesTaxPct,
     otherCosts:0,otherNotes:''
   });
+  jobs[0].jobNo=defaultJobNo(jobs[0]);
   save(); closeModal(); renderJobList();
   gcalSyncJob(jobs[0]);
   reconcileFollowUp(jobs[0]);
@@ -1715,6 +1735,8 @@ function showEditJobModal(id){
     <div class="modal-title">Edit Job</div>
     <label>Job Name *</label><input id="eName" type="text" value="${j.name.replace(/"/g,'&quot;')}"/>
     <label>Client</label><input id="eClient" type="text" value="${(j.client||'').replace(/"/g,'&quot;')}" placeholder="Client name"/>
+    <label>Job number</label><input id="eJobNo" type="text" value="${escAttr(getJobNo(j))}" placeholder="e.g. ${escAttr(defaultJobNo(j))}"/>
+    <div style="font-size:11px;color:var(--text3);margin:-4px 0 12px">Defaults to the date you created the job (year-monthday). Invoices add -01, -02 at the end.</div>
     ${contactsFieldHtml()}
     <label>Status</label>
     <select id="eStatus">${STATUS_OPTS.map(s=>`<option value="${s.val}"${s.val===(j.status||'inquiry')?' selected':''}>${s.label}</option>`).join('')}</select>
@@ -1738,6 +1760,8 @@ function saveJob(id){
   const wasArchived=isArchived(j);
   j.name=name;
   j.client=document.getElementById('eClient').value.trim();
+  const jn=(document.getElementById('eJobNo').value||'').trim();
+  j.jobNo = jn || defaultJobNo(j);
   j.status=document.getElementById('eStatus').value;
   j.startDate=document.getElementById('eStart').value;
   j.dueDate=document.getElementById('eDue').value;
